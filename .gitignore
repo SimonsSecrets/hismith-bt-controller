@@ -1,0 +1,40 @@
+## Build output
+bin/
+obj/
+out/
+publish/
+
+## Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Rider / JetBrains
+.idea/
+*.DotSettings.user
+
+## NuGet
+*.nupkg
+*.snupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+## User-specific files
+*.rsuser
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Logs
+*.log

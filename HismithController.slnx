@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HismithController/HismithController.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HismithController.Tests/HismithController.Tests.csproj" />
+  </Folder>
+</Solution>
