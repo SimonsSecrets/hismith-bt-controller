@@ -1,23 +1,23 @@
-﻿using System.Text;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+﻿using System.Windows;
+using HismithController.Bluetooth;
 
 namespace HismithController;
 
-/// <summary>
-/// Interaction logic for MainWindow.xaml
-/// </summary>
 public partial class MainWindow : Window
 {
-    public MainWindow()
+    private readonly IBleDeviceService _bleService;
+
+    public MainWindow(IBleDeviceService bleService)
     {
+        _bleService = bleService;
         InitializeComponent();
+
+        _bleService.StatusChanged += (_, status) =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                Title = $"HismithController — {status.State}";
+            });
+        };
     }
 }

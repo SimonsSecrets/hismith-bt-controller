@@ -1,10 +1,10 @@
 # HismithController
 
-Windows WinForms app: captures system audio → detects beats in real-time → controls Hismith BLE device speed.
+Windows WPF app: captures system audio → detects beats in real-time → controls Hismith BLE device speed.
 
 ## Architecture
 
-Three subsystems wired by C# events in `MainForm`:
+Three subsystems wired by C# events in `MainWindow`:
 1. **Audio** (`src/HismithController/Audio/`) — NAudio `WasapiLoopbackCapture` loopback capture
 2. **Beat Detection** (`src/HismithController/BeatDetection/`) — spectral flux onset detection
 3. **Bluetooth** (`src/HismithController/Bluetooth/`) — Windows WinRT BLE GATT writes
@@ -28,7 +28,7 @@ dotnet test HismithController.slnx
 - **Microsoft.Extensions.DependencyInjection 8.0.0** — DI container
 - **Microsoft.Extensions.Configuration.Json 8.0.0** — `AppConfig.json` settings
 
-Project targets `net8.0-windows10.0.19041.0`, x64 only (required for WinRT BLE APIs).
+Project targets `net8.0-windows10.0.19041.0` (required for WinRT BLE APIs).
 
 ## Beat Detection
 
@@ -41,20 +41,30 @@ Spectral flux with adaptive threshold (`SpectralFluxAnalyzer.cs`):
 
 ## Hismith BLE Protocol
 
-**Status: best-guess, requires reverse engineering with real hardware.**
+**Target device: Hismith Pro 1 (model AK-01, AK Series, product code 1001)**
 
-Likely Nordic UART Service (NUS):
-- Service UUID: `6E400001-B5A3-F393-E0A9-E50E24DCCA9E`
-- TX characteristic: `6E400002-B5A3-F393-E0A9-E50E24DCCA9E` (Write Without Response)
-- Command frame: `[0xAA, 0x01, speed(0–99), XOR_checksum, 0xFF]`
+Protocol validated via nRF Connect on 2026-05-18. Source: buttplug.io stpihkal issue #139.
 
-To confirm protocol: use nRF Connect on Android to sniff BLE traffic from the official HiApp during speed changes. Update `HismithProtocol.cs` with confirmed byte format and UUIDs.
+BLE advertisement name: `HISMITH`
+- Tx Service UUID: `0000ffe5-0000-1000-8000-00805f9b34fb`
+- Tx Characteristic UUID: `0000ffe9-0000-1000-8000-00805f9b34fb` (Write Without Response)
+- Rx Service UUID: `0000ffe0-0000-1000-8000-00805f9b34fb`
+- Rx Characteristic UUID: `0000ffe4-0000-1000-8000-00805f9b34fb`
+
+Command frame: `[0xAA, command_byte, value_byte, checksum]` where checksum = command_byte + value_byte (additive, truncated to byte).
+- Power on: `AA 01 00 01`
+- Power off: `AA 02 00 02`
+- Set speed: `AA 04 speed(00-64) checksum` — speed range 0–100
+- Stop: `AA 04 00 04`
+- Set mode: `AA 05 mode(01-09) checksum`
+
+See `HismithProtocol.cs` for the implementation.
 
 ## Threading Model
 
-- **UI thread** — WinForms message pump; all `Control` updates must happen here
+- **UI thread** — WPF dispatcher; all UI updates must go through `Dispatcher.InvokeAsync`
 - **Audio thread** — NAudio fires `DataAvailable` here; beat detection runs synchronously in this callback
-- **BLE writes** — `async`/`await` dispatched from the UI thread after marshaling beat events via `BeginInvoke`
+- **BLE writes** — `async`/`await` dispatched from the UI thread; serialized by `SemaphoreSlim` in `HismithBleDeviceService`
 
 ## Mock Mode
 
