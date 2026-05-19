@@ -1,0 +1,110 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=System.Runtime">
+
+    <!-- Background -->
+    <Color x:Key="BackgroundColor">#1A1218</Color>
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}" />
+
+    <!-- Surface -->
+    <Color x:Key="SurfaceColor">#251C23</Color>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
+
+    <Color x:Key="SurfaceSoftColor">#2D2229</Color>
+    <SolidColorBrush x:Key="SurfaceSoftBrush" Color="{StaticResource SurfaceSoftColor}" />
+
+    <!-- Borders -->
+    <Color x:Key="BorderColor">#3A2C36</Color>
+    <SolidColorBrush x:Key="AppBorderBrush" Color="{StaticResource BorderColor}" />
+
+    <Color x:Key="BorderStrongColor">#4A3A44</Color>
+    <SolidColorBrush x:Key="BorderStrongBrush" Color="{StaticResource BorderStrongColor}" />
+
+    <!-- Text -->
+    <Color x:Key="TextColor">#F5EDE8</Color>
+    <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}" />
+
+    <Color x:Key="TextDimColor">#A08890</Color>
+    <SolidColorBrush x:Key="TextDimBrush" Color="{StaticResource TextDimColor}" />
+
+    <Color x:Key="TextFaintColor">#75636B</Color>
+    <SolidColorBrush x:Key="TextFaintBrush" Color="{StaticResource TextFaintColor}" />
+
+    <!-- Rose (primary accent) -->
+    <Color x:Key="RoseColor">#D98FA0</Color>
+    <SolidColorBrush x:Key="RoseBrush" Color="{StaticResource RoseColor}" />
+
+    <Color x:Key="RoseHoverColor">#E59FAE</Color>
+    <SolidColorBrush x:Key="RoseHoverBrush" Color="{StaticResource RoseHoverColor}" />
+
+    <Color x:Key="RoseDarkColor">#B47082</Color>
+    <SolidColorBrush x:Key="RoseDarkBrush" Color="{StaticResource RoseDarkColor}" />
+
+    <Color x:Key="RoseTintColor">#3A252E</Color>
+    <SolidColorBrush x:Key="RoseTintBrush" Color="{StaticResource RoseTintColor}" />
+
+    <Color x:Key="RoseSoftColor">#2A1C24</Color>
+    <SolidColorBrush x:Key="RoseSoftBrush" Color="{StaticResource RoseSoftColor}" />
+
+    <!-- Gold -->
+    <Color x:Key="GoldColor">#E0BB7A</Color>
+    <SolidColorBrush x:Key="GoldBrush" Color="{StaticResource GoldColor}" />
+
+    <Color x:Key="GoldTintColor">#3A2D1F</Color>
+    <SolidColorBrush x:Key="GoldTintBrush" Color="{StaticResource GoldTintColor}" />
+
+    <!-- Sage (success / connected) -->
+    <Color x:Key="SageColor">#93B79A</Color>
+    <SolidColorBrush x:Key="SageBrush" Color="{StaticResource SageColor}" />
+
+    <Color x:Key="SageTintColor">#243028</Color>
+    <SolidColorBrush x:Key="SageTintBrush" Color="{StaticResource SageTintColor}" />
+
+    <!-- Coral (error) -->
+    <Color x:Key="CoralColor">#E1A092</Color>
+    <SolidColorBrush x:Key="CoralBrush" Color="{StaticResource CoralColor}" />
+
+    <Color x:Key="CoralTintColor">#3A2722</Color>
+    <SolidColorBrush x:Key="CoralTintBrush" Color="{StaticResource CoralTintColor}" />
+
+    <!-- Amber (scanning / connecting) -->
+    <Color x:Key="AmberColor">#E0BB7A</Color>
+    <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}" />
+
+    <Color x:Key="AmberTintColor">#3A2D1F</Color>
+    <SolidColorBrush x:Key="AmberTintBrush" Color="{StaticResource AmberTintColor}" />
+
+    <!-- Titlebar -->
+    <Color x:Key="TitlebarColor">#20161C</Color>
+    <SolidColorBrush x:Key="TitlebarBrush" Color="{StaticResource TitlebarColor}" />
+
+    <!-- Window button hover -->
+    <SolidColorBrush x:Key="WinButtonHoverBrush" Color="#0FFFFFFF" />
+
+    <!-- Stop button -->
+    <Color x:Key="StopButtonColor">#6A4452</Color>
+    <SolidColorBrush x:Key="StopButtonBrush" Color="{StaticResource StopButtonColor}" />
+
+    <Color x:Key="StopButtonHoverColor">#7E5364</Color>
+    <SolidColorBrush x:Key="StopButtonHoverBrush" Color="{StaticResource StopButtonHoverColor}" />
+
+    <SolidColorBrush x:Key="StopButtonDisabledBrush" Color="#2C1F26" />
+    <SolidColorBrush x:Key="StopButtonDisabledForegroundBrush" Color="#75636B" />
+
+    <!-- Disabled -->
+    <SolidColorBrush x:Key="DisabledBrush" Color="#2D2229" />
+
+    <!-- Kbd (keyboard hint) -->
+    <SolidColorBrush x:Key="KbdBrush" Color="#312430" />
+
+    <!-- Logo gradient stops -->
+    <Color x:Key="LogoGradientStart">#D98FA0</Color>
+    <Color x:Key="LogoGradientMid">#E0A07F</Color>
+    <Color x:Key="LogoGradientEnd">#E0BB7A</Color>
+
+    <!-- Shadow -->
+    <Color x:Key="CardShadowColor">#73000000</Color>
+    <Color x:Key="PopoverShadowColor">#99000000</Color>
+    <system:Double x:Key="CardShadowOpacity">1.0</system:Double>
+
+</ResourceDictionary>

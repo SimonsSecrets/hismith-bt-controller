@@ -1,0 +1,193 @@
+<UserControl x:Class="HismithController.Views.ConnectedView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:HismithController.ViewModels"
+             xmlns:ctrl="clr-namespace:HismithController.Controls"
+             xmlns:conv="clr-namespace:HismithController.Converters"
+             d:DataContext="{d:DesignInstance vm:MainViewModel}"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+        <conv:StringEqualConverter x:Key="StringEqualConverter" />
+    </UserControl.Resources>
+
+    <DockPanel>
+        <!-- ==================== FOOTER ==================== -->
+        <Border DockPanel.Dock="Bottom"
+                BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0"
+                Background="{DynamicResource BackgroundBrush}"
+                Padding="28,14">
+            <DockPanel>
+                <!-- Stop button -->
+                <Button x:Name="StopBtn" DockPanel.Dock="Left"
+                        Command="{Binding EmergencyStopCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource StopButton}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsStopFlashing}" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource CoralBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <TextBlock x:Name="StopText">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="Stop" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStopFlashing}" Value="True">
+                                        <Setter Property="Text" Value="Stopped" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Button>
+
+                <!-- Keyboard hint -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <Border Style="{StaticResource KbdHint}">
+                        <TextBlock Text="Space" FontSize="11"
+                                   Foreground="{DynamicResource TextDimBrush}" />
+                    </Border>
+                    <TextBlock Text=" emergency stop" FontSize="12"
+                               Foreground="{DynamicResource TextDimBrush}"
+                               VerticalAlignment="Center" Margin="8,0,0,0" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ==================== MAIN CONTENT ==================== -->
+        <Grid Margin="20,24,20,24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- ========== MODE BAR ========== -->
+            <Grid Grid.Row="0" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Theme toggle (left) -->
+                <Button Grid.Column="0" HorizontalAlignment="Left"
+                        Command="{Binding ToggleThemeCommand}" Cursor="Hand"
+                        ToolTip="Toggle theme">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Grid Width="38" Height="38" Background="Transparent">
+                                <!-- Shadow layer -->
+                                <Border CornerRadius="999"
+                                        Background="{DynamicResource SurfaceBrush}">
+                                    <Border.Effect>
+                                        <DropShadowEffect ShadowDepth="2" BlurRadius="8"
+                                                          Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                                    </Border.Effect>
+                                </Border>
+                                <!-- Content layer -->
+                                <Border x:Name="ToggleBg" CornerRadius="999"
+                                        Background="{DynamicResource SurfaceBrush}"
+                                        BorderBrush="{DynamicResource AppBorderBrush}"
+                                        BorderThickness="1">
+                                    <Grid>
+                                        <!-- Sun icon (light mode) -->
+                                        <Path x:Name="SunIcon"
+                                              Data="M12 12 m-4 0 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 M12 2 V4 M12 20 V22 M4.93 4.93 L6.34 6.34 M17.66 17.66 L19.07 19.07 M2 12 H4 M20 12 H22 M4.93 19.07 L6.34 17.66 M17.66 6.34 L19.07 4.93"
+                                              Stroke="{DynamicResource TextBrush}" StrokeThickness="1.6"
+                                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                              Width="16" Height="16" Stretch="Uniform"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <!-- Moon icon (dark mode) -->
+                                        <Path x:Name="MoonIcon" Visibility="Collapsed"
+                                              Data="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+                                              Stroke="{DynamicResource TextBrush}" StrokeThickness="1.6" Fill="Transparent"
+                                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                              Width="16" Height="16" Stretch="Uniform"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="ToggleBg" Property="Background"
+                                            Value="{DynamicResource SurfaceSoftBrush}" />
+                                    <Setter TargetName="ToggleBg" Property="BorderBrush"
+                                            Value="{DynamicResource BorderStrongBrush}" />
+                                </Trigger>
+                                <DataTrigger Binding="{Binding IsDarkTheme}" Value="True">
+                                    <Setter TargetName="SunIcon" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="MoonIcon" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <!-- Mode strip (center) -->
+                <Grid Grid.Column="1">
+                    <!-- Shadow layer -->
+                    <Border CornerRadius="20" Background="{DynamicResource SurfaceBrush}">
+                        <Border.Effect>
+                            <DropShadowEffect ShadowDepth="2" BlurRadius="8"
+                                              Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                        </Border.Effect>
+                    </Border>
+                    <!-- Content layer -->
+                    <Border CornerRadius="20"
+                            Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource AppBorderBrush}"
+                            BorderThickness="1"
+                            Padding="4">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton Style="{StaticResource ModeTab}"
+                                         IsChecked="{Binding ActiveMode, Converter={StaticResource StringEqualConverter}, ConverterParameter=Manual}"
+                                         Command="{Binding SwitchModeCommand}" CommandParameter="Manual">
+                                <TextBlock Text="Manual" />
+                            </RadioButton>
+                            <RadioButton Style="{StaticResource ModeTab}"
+                                         IsChecked="{Binding ActiveMode, Converter={StaticResource StringEqualConverter}, ConverterParameter=Sound}"
+                                         Command="{Binding SwitchModeCommand}" CommandParameter="Sound">
+                                <TextBlock Text="Sound" />
+                            </RadioButton>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Status chip (right) -->
+                <ctrl:StatusChip Grid.Column="2" HorizontalAlignment="Right"
+                                 DataContext="{Binding}" />
+            </Grid>
+
+            <!-- ========== MODE CONTENT (placeholder) ========== -->
+            <Grid Grid.Row="1">
+                <!-- Shadow layer -->
+                <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}">
+                    <Border.Effect>
+                        <DropShadowEffect ShadowDepth="4" BlurRadius="28"
+                                          Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                    </Border.Effect>
+                </Border>
+                <!-- Content layer -->
+                <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                        Padding="28" ClipToBounds="True">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding ActiveMode, StringFormat='{}{0} Mode'}"
+                                   Style="{StaticResource SubHeaderText}"
+                                   HorizontalAlignment="Center" Margin="0,0,0,8" />
+                        <TextBlock Text="Coming soon"
+                                   FontSize="13" Foreground="{DynamicResource TextDimBrush}"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</UserControl>

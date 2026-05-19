@@ -1,23 +1,27 @@
-﻿using System.Windows;
-using HismithController.Bluetooth;
+using System.Windows;
+using System.Windows.Input;
+using HismithController.ViewModels;
 
 namespace HismithController;
 
 public partial class MainWindow : Window
 {
-    private readonly IBleDeviceService _bleService;
+    private readonly MainViewModel _viewModel;
 
-    public MainWindow(IBleDeviceService bleService)
+    public MainWindow(MainViewModel viewModel)
     {
-        _bleService = bleService;
+        _viewModel = viewModel;
+        DataContext = viewModel;
         InitializeComponent();
+    }
 
-        _bleService.StatusChanged += (_, status) =>
+    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Space && _viewModel.IsConnected)
         {
-            Dispatcher.InvokeAsync(() =>
-            {
-                Title = $"HismithController — {status.State}";
-            });
-        };
+            e.Handled = true;
+            if (_viewModel.EmergencyStopCommand.CanExecute(null))
+                _viewModel.EmergencyStopCommand.Execute(null);
+        }
     }
 }

@@ -1,0 +1,548 @@
+<UserControl x:Class="HismithController.Views.ConnectionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:HismithController.ViewModels"
+             xmlns:conv="clr-namespace:HismithController.Converters"
+             xmlns:svc="clr-namespace:HismithController.Services"
+             d:DataContext="{d:DesignInstance vm:ConnectionViewModel}"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <conv:EnumToVisibilityConverter x:Key="EnumToVis" />
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+        <conv:SignalStrengthConverter x:Key="SignalConv" />
+        <conv:StepActiveConverter x:Key="StepActiveConv" />
+
+        <!-- Device row template -->
+        <DataTemplate DataType="{x:Type svc:DiscoveredDevice}">
+            <Border x:Name="RowBorder"
+                    Style="{StaticResource DeviceRow}"
+                    Margin="0,0,0,8">
+                <Border.InputBindings>
+                    <MouseBinding MouseAction="LeftClick"
+                                  Command="{Binding DataContext.SelectDeviceCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                  CommandParameter="{Binding}" />
+                </Border.InputBindings>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Bluetooth icon box -->
+                    <Border x:Name="IconBox" Grid.Column="0"
+                            Width="32" Height="32" CornerRadius="8"
+                            Background="White"
+                            BorderBrush="{DynamicResource AppBorderBrush}"
+                            BorderThickness="1"
+                            Margin="0,0,12,0">
+                        <Path Data="M7 7 L17 17 L12 22 V2 L17 7 L7 17"
+                              Stroke="{DynamicResource RoseBrush}" StrokeThickness="1.6"
+                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Width="16" Height="16" Stretch="Uniform"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+
+                    <!-- Name + Address -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13.5"
+                                   Foreground="{DynamicResource TextBrush}" />
+                        <TextBlock Text="{Binding Address}" FontSize="11"
+                                   Foreground="{DynamicResource TextDimBrush}" Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <!-- Signal bars -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                VerticalAlignment="Center" Margin="8,0"
+                                Height="14">
+                        <Border Width="3" CornerRadius="1" Margin="0,0,2,0"
+                                VerticalAlignment="Bottom" Height="5"
+                                Background="{DynamicResource RoseBrush}"
+                                Opacity="{Binding SignalStrength, Converter={StaticResource SignalConv}, ConverterParameter=1}" />
+                        <Border Width="3" CornerRadius="1" Margin="0,0,2,0"
+                                VerticalAlignment="Bottom" Height="9"
+                                Background="{DynamicResource RoseBrush}"
+                                Opacity="{Binding SignalStrength, Converter={StaticResource SignalConv}, ConverterParameter=2}" />
+                        <Border Width="3" CornerRadius="1"
+                                VerticalAlignment="Bottom" Height="13"
+                                Background="{DynamicResource RoseBrush}"
+                                Opacity="{Binding SignalStrength, Converter={StaticResource SignalConv}, ConverterParameter=3}" />
+                    </StackPanel>
+
+                    <!-- Tap to select / checkmark -->
+                    <TextBlock x:Name="TapHint" Grid.Column="3"
+                               Text="Tap to select" FontSize="11"
+                               Foreground="{DynamicResource TextFaintBrush}"
+                               VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <DataTemplate.Triggers>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <MultiBinding>
+                            <MultiBinding.Converter>
+                                <conv:SelectedDeviceConverter />
+                            </MultiBinding.Converter>
+                            <Binding />
+                            <Binding Path="DataContext.SelectedDevice"
+                                     RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                        </MultiBinding>
+                    </DataTrigger.Binding>
+                    <Setter TargetName="RowBorder" Property="Background"
+                            Value="{DynamicResource RoseTintBrush}" />
+                    <Setter TargetName="RowBorder" Property="BorderBrush"
+                            Value="{DynamicResource RoseBrush}" />
+                    <Setter TargetName="IconBox" Property="Background"
+                            Value="{DynamicResource RoseBrush}" />
+                    <Setter TargetName="IconBox" Property="BorderBrush"
+                            Value="{DynamicResource RoseBrush}" />
+                    <Setter TargetName="TapHint" Property="Text" Value="&#x2713;" />
+                    <Setter TargetName="TapHint" Property="Foreground"
+                            Value="{DynamicResource RoseBrush}" />
+                    <Setter TargetName="TapHint" Property="FontSize" Value="16" />
+                    <Setter TargetName="TapHint" Property="FontWeight" Value="Bold" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <!-- Main content area — centered, max 480px wide -->
+    <Grid HorizontalAlignment="Center"
+          MaxWidth="480" Width="480" Margin="20,24">
+
+        <!-- ==================== PRE-CONNECT ==================== -->
+        <Grid Visibility="{Binding Phase, Converter={StaticResource EnumToVis}, ConverterParameter=PreConnect}">
+            <!-- Shadow layer -->
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="0" BlurRadius="28" Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                </Border.Effect>
+            </Border>
+            <!-- Content layer -->
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                    Padding="40,40,40,28" ClipToBounds="True">
+                <StackPanel HorizontalAlignment="Center">
+                    <!-- Bluetooth icon circle -->
+                    <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
+                        <Ellipse Fill="{DynamicResource RoseTintBrush}" />
+                        <Path Data="M7 7 L17 17 L12 22 V2 L17 7 L7 17"
+                              Stroke="{DynamicResource RoseBrush}" StrokeThickness="1.4"
+                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Width="32" Height="32" Stretch="Uniform"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <TextBlock Text="Connect your Hismith" Style="{StaticResource HeaderText}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Style="{StaticResource BodyText}"
+                               TextAlignment="Center" Margin="0,8,0,22">
+                        Turn your Hismith on and make sure Bluetooth is enabled on this PC, then scan for nearby devices.
+                    </TextBlock>
+                    <Button Style="{StaticResource PrimaryButtonLarge}"
+                            Command="{Binding ScanForDevicesCommand}"
+                            HorizontalAlignment="Center" MinWidth="180">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="M12 12 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M8.5 8.5 a5 5 0 0 1 7 0 M5.5 5.5 a9 9 0 0 1 13 0 M8.5 15.5 a5 5 0 0 0 7 0 M5.5 18.5 a9 9 0 0 0 13 0"
+                                  Stroke="White" StrokeThickness="1.6"
+                                  StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0" />
+                            <TextBlock Text="Scan for devices" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ==================== SCANNING ==================== -->
+        <Grid Visibility="{Binding Phase, Converter={StaticResource EnumToVis}, ConverterParameter=Scanning}">
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="0" BlurRadius="28" Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                </Border.Effect>
+            </Border>
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                    Padding="40,40,40,28" ClipToBounds="True">
+                <DockPanel>
+                    <!-- Top section -->
+                    <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center">
+                        <!-- Scanning icon with ripple -->
+                        <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
+                            <Grid.Triggers>
+                                <EventTrigger RoutedEvent="Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <!-- Ring 1 -->
+                                            <DoubleAnimation Storyboard.TargetName="RippleRing1"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                             From="0.6" To="1.5" Duration="0:0:2" />
+                                            <DoubleAnimation Storyboard.TargetName="RippleRing1"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                             From="0.6" To="1.5" Duration="0:0:2" />
+                                            <DoubleAnimation Storyboard.TargetName="RippleRing1"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             From="0.7" To="0" Duration="0:0:2" />
+                                            <!-- Ring 2 (delayed) -->
+                                            <DoubleAnimation Storyboard.TargetName="RippleRing2"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                             From="0.6" To="1.5" Duration="0:0:2" BeginTime="0:0:1" />
+                                            <DoubleAnimation Storyboard.TargetName="RippleRing2"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                             From="0.6" To="1.5" Duration="0:0:2" BeginTime="0:0:1" />
+                                            <DoubleAnimation Storyboard.TargetName="RippleRing2"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             From="0.7" To="0" Duration="0:0:2" BeginTime="0:0:1" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Grid.Triggers>
+                            <Ellipse x:Name="RippleRing1" Stroke="{DynamicResource RoseBrush}"
+                                     StrokeThickness="1.5" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <ScaleTransform ScaleX="0.6" ScaleY="0.6" />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                            <Ellipse x:Name="RippleRing2" Stroke="{DynamicResource RoseBrush}"
+                                     StrokeThickness="1.5" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <ScaleTransform ScaleX="0.6" ScaleY="0.6" />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                            <Ellipse Fill="{DynamicResource RoseTintBrush}" Width="80" Height="80" />
+                            <Path Data="M12 12 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M8.5 8.5 a5 5 0 0 1 7 0 M5.5 5.5 a9 9 0 0 1 13 0 M8.5 15.5 a5 5 0 0 0 7 0 M5.5 18.5 a9 9 0 0 0 13 0"
+                                  Stroke="{DynamicResource RoseBrush}" StrokeThickness="1.4"
+                                  StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Width="32" Height="32" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock Text="Scanning…" Style="{StaticResource HeaderText}"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="Looking for nearby Hismith devices."
+                                   Style="{StaticResource BodyText}"
+                                   TextAlignment="Center" Margin="0,8,0,18" />
+                    </StackPanel>
+
+                    <!-- Bottom buttons -->
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                                HorizontalAlignment="Center" Margin="0,18,0,0">
+                        <Button Style="{StaticResource GhostButton}"
+                                Content="Cancel" MinWidth="110"
+                                Command="{Binding CancelScanCommand}" Margin="0,0,10,0" />
+                        <Button Style="{StaticResource PrimaryButton}"
+                                Content="Connect" MinWidth="110"
+                                Command="{Binding ConnectToDeviceCommand}"
+                                Visibility="{Binding SelectedDevice, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+
+                    <!-- Device list / placeholder -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,0,0">
+                        <Grid>
+                            <!-- Empty placeholder (visible when no devices found yet) -->
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Margin="0,20"
+                                        Visibility="{Binding DiscoveredDevices.Count, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
+                                    <Ellipse Width="8" Height="8" Fill="{DynamicResource RoseTintBrush}" Margin="0,0,6,0" />
+                                    <Ellipse Width="8" Height="8" Fill="{DynamicResource RoseTintBrush}" Margin="0,0,6,0" />
+                                    <Ellipse Width="8" Height="8" Fill="{DynamicResource RoseTintBrush}" />
+                                </StackPanel>
+                                <TextBlock Text="Looking for devices…" FontSize="13"
+                                           Foreground="{DynamicResource TextDimBrush}" />
+                            </StackPanel>
+
+                            <!-- Device list -->
+                            <ItemsControl ItemsSource="{Binding DiscoveredDevices}"
+                                          Visibility="{Binding DiscoveredDevices.Count, Converter={StaticResource BoolToVis}}" />
+                        </Grid>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- ==================== DEVICES FOUND ==================== -->
+        <Grid Visibility="{Binding Phase, Converter={StaticResource EnumToVis}, ConverterParameter=DevicesFound}">
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="0" BlurRadius="28" Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                </Border.Effect>
+            </Border>
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                    Padding="40,40,40,28" ClipToBounds="True">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center">
+                        <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
+                            <Ellipse Fill="{DynamicResource RoseTintBrush}" />
+                            <Path Data="M7 7 L17 17 L12 22 V2 L17 7 L7 17"
+                                  Stroke="{DynamicResource RoseBrush}" StrokeThickness="1.4"
+                                  StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Width="32" Height="32" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock Text="Choose a device" Style="{StaticResource HeaderText}"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="Tap a device, then connect."
+                                   Style="{StaticResource BodyText}"
+                                   TextAlignment="Center" Margin="0,8,0,18" />
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                                HorizontalAlignment="Center" Margin="0,18,0,0">
+                        <Button Style="{StaticResource GhostButton}"
+                                Content="Rescan" MinWidth="110"
+                                Command="{Binding ScanForDevicesCommand}" Margin="0,0,10,0" />
+                        <Button Style="{StaticResource PrimaryButton}"
+                                Content="Connect" MinWidth="110"
+                                Command="{Binding ConnectToDeviceCommand}"
+                                Visibility="{Binding SelectedDevice, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding DiscoveredDevices}" />
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- ==================== NO DEVICES FOUND ==================== -->
+        <Grid Visibility="{Binding Phase, Converter={StaticResource EnumToVis}, ConverterParameter=NoDevicesFound}">
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="0" BlurRadius="28" Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                </Border.Effect>
+            </Border>
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                    Padding="40,40,40,28" ClipToBounds="True">
+                <StackPanel HorizontalAlignment="Center">
+                    <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
+                        <Ellipse Fill="{DynamicResource RoseTintBrush}" />
+                        <Path Data="M7 7 L17 17 L12 22 V2 L17 7 L7 17"
+                              Stroke="{DynamicResource RoseBrush}" StrokeThickness="1.4"
+                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Width="32" Height="32" Stretch="Uniform"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <TextBlock Text="No devices found" Style="{StaticResource HeaderText}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Style="{StaticResource BodyText}"
+                               TextAlignment="Center" Margin="0,8,0,22">
+                        Make sure your Hismith is powered on and nearby.
+                    </TextBlock>
+                    <Button Style="{StaticResource PrimaryButton}"
+                            Content="Try again" MinWidth="140"
+                            Command="{Binding RetryCommand}"
+                            HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ==================== CONNECTING ==================== -->
+        <Grid Visibility="{Binding Phase, Converter={StaticResource EnumToVis}, ConverterParameter=Connecting}">
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="0" BlurRadius="28" Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                </Border.Effect>
+            </Border>
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                    Padding="40,40,40,28" ClipToBounds="True">
+                <StackPanel HorizontalAlignment="Center">
+                    <!-- Spinner -->
+                    <Ellipse Width="36" Height="36" Margin="0,0,0,14"
+                             Stroke="{DynamicResource RoseSoftBrush}" StrokeThickness="3"
+                             HorizontalAlignment="Center"
+                             RenderTransformOrigin="0.5,0.5">
+                        <Ellipse.StrokeDashArray>
+                            <DoubleCollection>4,6</DoubleCollection>
+                        </Ellipse.StrokeDashArray>
+                        <Ellipse.RenderTransform>
+                            <RotateTransform />
+                        </Ellipse.RenderTransform>
+                        <Ellipse.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation
+                                            Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                            From="0" To="360" Duration="0:0:0.9" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Ellipse.Triggers>
+                    </Ellipse>
+
+                    <TextBlock Style="{StaticResource HeaderText}" HorizontalAlignment="Center">
+                        <TextBlock.Text>
+                            <Binding Path="SelectedDevice.Name" StringFormat="Connecting to {0}…" />
+                        </TextBlock.Text>
+                    </TextBlock>
+                    <TextBlock Text="This usually takes a few seconds."
+                               Style="{StaticResource BodyText}"
+                               TextAlignment="Center" Margin="0,8,0,12" />
+
+                    <!-- Two-step progress -->
+                    <StackPanel HorizontalAlignment="Center" Margin="0,12,0,0">
+                        <!-- Step 1 -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <Border Margin="0,0,8,0">
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource StepCircle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=1}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource RoseTintBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource RoseBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="1" FontSize="10" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=1}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource RoseBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Border>
+                            <TextBlock Text="Establishing connection" FontSize="12"
+                                       VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=1}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                        <!-- Step 2 -->
+                        <StackPanel Orientation="Horizontal">
+                            <Border Margin="0,0,8,0">
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource StepCircle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=2}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource RoseTintBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource RoseBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="2" FontSize="10" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=2}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource RoseBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Border>
+                            <TextBlock Text="Verifying device compatibility" FontSize="12"
+                                       VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=2}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ==================== CONNECTION FAILED ==================== -->
+        <Grid Visibility="{Binding Phase, Converter={StaticResource EnumToVis}, ConverterParameter=ConnectionFailed}">
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="0" BlurRadius="28" Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                </Border.Effect>
+            </Border>
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                    Padding="40,40,40,28" ClipToBounds="True">
+                <StackPanel HorizontalAlignment="Center">
+                    <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
+                        <Ellipse Fill="{DynamicResource CoralTintBrush}" />
+                        <Path Data="M12 4 L22 20 H2 Z M12 10 V15 M12 18 V18.5"
+                              Stroke="{DynamicResource CoralBrush}" StrokeThickness="1.5"
+                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Width="28" Height="28" Stretch="Uniform"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <TextBlock Text="Couldn't connect" Style="{StaticResource HeaderText}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               Style="{StaticResource BodyText}"
+                               TextAlignment="Center" Margin="0,8,0,22" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Style="{StaticResource GhostButton}"
+                                Content="Go back" MinWidth="110"
+                                Command="{Binding GoBackCommand}" Margin="0,0,8,0" />
+                        <Button Style="{StaticResource PrimaryButton}"
+                                Content="Try again" MinWidth="110"
+                                Command="{Binding RetryCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ==================== INCOMPATIBLE DEVICE ==================== -->
+        <Grid Visibility="{Binding Phase, Converter={StaticResource EnumToVis}, ConverterParameter=IncompatibleDevice}">
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="0" BlurRadius="28" Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                </Border.Effect>
+            </Border>
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                    Padding="40,40,40,28" ClipToBounds="True">
+                <StackPanel HorizontalAlignment="Center">
+                    <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
+                        <Ellipse Fill="{DynamicResource CoralTintBrush}" />
+                        <Path Data="M12 4 L22 20 H2 Z M12 10 V15 M12 18 V18.5"
+                              Stroke="{DynamicResource CoralBrush}" StrokeThickness="1.5"
+                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Width="28" Height="28" Stretch="Uniform"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <TextBlock Text="Incompatible device" Style="{StaticResource HeaderText}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Style="{StaticResource BodyText}"
+                               TextAlignment="Center" Margin="0,8,0,22">
+                        This device doesn't appear to be a compatible Hismith. Please choose a different device.
+                    </TextBlock>
+                    <Button Style="{StaticResource PrimaryButton}"
+                            Content="Go back" MinWidth="140"
+                            Command="{Binding GoBackCommand}"
+                            HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
