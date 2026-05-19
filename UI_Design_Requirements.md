@@ -1,13 +1,13 @@
 # HismithController — UI Design Requirements
 **Platform:** Windows WPF desktop application  
 **Target user:** General consumer — expects a polished, guided experience with clear affordances and minimal jargon  
-**Visual direction:** Clean, light, and elegant with a warm feminine aesthetic — soft blush/rose tones, rounded forms, refined typography, smooth animations
+**Visual direction:** Clean and elegant with a warm feminine aesthetic — soft blush/rose tones, rounded forms, refined typography, smooth animations. Both a light and a dark theme are required; the dark theme preserves the same warmth using deep plum-toned darks rather than cold greys.
 
 ---
 
 ## 1. Visual Design Language
 
-### Palette
+### Light Theme Palette
 - **Background:** Warm white or very light blush (e.g. `#FDF8F6` or similar off-white with a warm tint)
 - **Surface/card:** Pure white with a subtle drop shadow — used for panels and content cards
 - **Primary accent:** Dusty rose / mauve (e.g. `#C4768A` range) — used for primary buttons, active states, highlights
@@ -17,6 +17,27 @@
 - **Success:** Soft sage green
 - **Error/warning:** Muted coral (avoid harsh red — keep it on-palette)
 - **Disabled:** Light warm grey, never harsh
+
+### Dark Theme Palette
+The dark theme should feel intimate and refined — not the cold blue-grey of a typical "developer dark mode." The key is to use deep plum-brown tones as the neutral base, which keeps the rose accent colours harmonious rather than clashing.
+
+- **Background:** Deep plum-charcoal (e.g. `#1A1218`) — dark with a clear warm/purple undertone; never pure black or cold grey
+- **Surface/card:** One step lighter than the background (e.g. `#251C23`) — enough contrast to distinguish cards without a harsh border; drop shadows become subtle inner glows or very soft elevation
+- **Surface raised** *(for popovers, dropdowns, tooltips)*: A further step lighter (e.g. `#312430`) — creates a clear three-level depth hierarchy
+- **Primary accent:** Slightly brightened dusty rose (e.g. `#D98FA0`) — a touch lighter and more saturated than the light-mode value so it reads clearly against dark backgrounds while remaining in the same rose family
+- **Secondary accent:** Warm champagne/gold carries forward well on dark (e.g. `#E0BB7A`) — slightly warmer and brighter than the light-mode value
+- **Text primary:** Warm off-white (e.g. `#F5EDE8`) — never pure white; the warm tint keeps it in the palette
+- **Text secondary:** Muted rose-grey (e.g. `#A08890`) — readable but clearly subordinate
+- **Success:** Muted sage, slightly lighter than the light-mode value so it reads on dark surfaces
+- **Error/warning:** Soft coral, same family as light mode — slightly more saturated to be legible on dark backgrounds
+- **Disabled:** Deep muted plum-grey — present but clearly inactive
+
+### Theme Switching
+- The app should default to the user's Windows system theme (light or dark) on first launch
+- A manual **theme toggle** (sun / moon icon) is placed in the app header, alongside the device status chip
+- Switching themes animates with a gentle crossfade (200–300ms) — no hard flash
+- The selected theme preference is persisted between sessions
+- All components, illustrations, and icons must be designed for both themes; no element should be designed only once and assumed to work on both backgrounds
 
 ### Typography
 - **Font family:** Segoe UI (system font, WPF native) — clean and readable at all sizes
@@ -239,9 +260,10 @@ A content card with:
 
 1. **Audio visualizer** (top section)
 2. **Beat indicator**
-3. **Max speed control**
-4. **Live stats bar**
-5. **Play / Pause**
+3. **Thrust rhythm selector**
+4. **Max speed control**
+5. **Live stats bar**
+6. **Play / Pause**
 
 ### 6.1 Audio Visualizer
 - A **waveform or spectrum bar visualizer** running in real time — the most visually engaging element of this mode
@@ -255,26 +277,47 @@ A content card with:
 - Positioned prominently, near or overlaid on the visualizer
 - Doubles as a visual confirmation that beat detection is working
 
-### 6.3 Max Speed Control
-An optional ceiling that caps the speed commands sent in Sound mode.
+### 6.3 Thrust Rhythm Selector
+Controls how detected beats are translated into device strokes — specifically, how many beats make up one full thrust cycle (forward + back).
 
-- A single slider labelled *"Max speed"*, spanning 0–240 BPM (displayed as an integer)
+This is presented as a **3-option segmented control or tile selector**, using plain-language labels with a short description under each. The internal ratios are never shown to the user.
+
+| Option | Label | Description shown in UI |
+|---|---|---|
+| 1:1 | **Every beat** | *"The device thrusts with every beat"* |
+| 1:2 | **Every 2 beats** | *"Forward on beat 1, back on beat 2 — a slower, fuller stroke"* |
+| 1:4 | **Every 4 beats** | *"Forward for two beats, back for two beats — the most drawn-out rhythm"* |
+
+- Default: **Every beat** (1:1)
+- Each option may include a small abstract rhythm diagram — e.g. a row of dots or tick marks with an arrow showing the stroke pattern — to make the options scannable without reading the description
+- Changing the selection takes effect immediately on the next detected beat; no confirmation needed
+- The device BPM sent is: `detected BPM ÷ ratio` (e.g. detected 120 BPM on 1:2 = 60 BPM sent to device)
+
+### 6.4 Max Speed Control
+An optional ceiling that caps the BPM value **sent to the device** — i.e. it applies after the thrust rhythm ratio has been applied, not to the raw detected BPM.
+
+For example: if the music is at 160 BPM, the rhythm is set to *Every 2 beats* (÷2 = 80 BPM to device), and the max speed cap is 60 BPM — then 60 BPM is sent (the cap is honoured on the device value, not the 160 BPM source).
+
+- A single slider labelled *"Max device speed"*, spanning 0–240 BPM (displayed as an integer)
 - Default: 240 BPM (uncapped — full range)
 - The current value is shown as both BPM and its percentage equivalent, mirroring the dual-unit display convention from Manual mode: e.g. *"180 BPM · 75%"*
 - When set below 240, a subtle indicator communicates that a cap is active (e.g. the slider track beyond the thumb is visually muted, or a small badge reads *"Capped"*)
 - The control is entirely optional — if the user has never touched it, it defaults to the maximum and no cap is applied
 
-### 6.4 Live Stats Bar
-A small strip at the bottom of the card:
-- *"BPM: 128"* — live tempo estimate
-- *"Speed: 64%"* — current command value being sent to the device
-- Updates smoothly, not jittery (moving average on BPM display)
+### 6.5 Live Stats Bar
+A small strip at the bottom of the card showing three values:
 
-### 6.5 Play / Pause
+- **Music** — the detected tempo from the audio, e.g. *"128 BPM"*
+- **Device** — the BPM actually being sent to the device after the thrust rhythm ratio and speed cap are applied, e.g. *"64 BPM"*
+- **Speed** — the same device value expressed as a percentage, e.g. *"27%"*
+
+When the thrust rhythm is *Every beat* and no cap is active, Music and Device will match. When they diverge (ratio applied or cap hit), showing both values helps the user understand why the device feels slower than the music tempo. All values update smoothly using a moving average — not jittery frame-by-frame changes.
+
+### 6.6 Play / Pause
 - A **Play/Pause button** to start and stop beat detection without leaving the mode
 - When paused, the visualizer continues (so the user can see audio) but no commands are sent — display a pill badge: *"Detection paused"*
 
-### 6.6 Future: Sensitivity Control *(not in current scope)*
+### 6.7 Future: Sensitivity Control *(not in current scope)*
 A beat sensitivity control (mapping to the internal `OnsetMultiplier`) is a planned future addition. Reserve space in the layout for a control labelled *"Beat sensitivity"* with Low / Medium / High anchors, but it should not be built or exposed in the initial release. A placeholder/greyed-out treatment is acceptable if helpful for layout continuity.
 
 ---
