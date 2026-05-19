@@ -155,6 +155,12 @@
                             <TextBlock Text="Scan for devices" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
+                    <Button Style="{StaticResource GhostButton}"
+                            Content="Skip to connected (debug)"
+                            Command="{Binding SkipToConnectedCommand}"
+                            HorizontalAlignment="Center"
+                            Margin="0,10,0,0" FontSize="11"
+                            Visibility="{Binding IsMockMode, Converter={StaticResource BoolToVis}}" />
                 </StackPanel>
             </Border>
         </Grid>

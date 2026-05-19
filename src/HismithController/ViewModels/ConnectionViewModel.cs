@@ -3,6 +3,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HismithController.Bluetooth;
+using HismithController.Configuration;
 using HismithController.Services;
 
 namespace HismithController.ViewModels;
@@ -22,6 +23,9 @@ public partial class ConnectionViewModel : ObservableObject
 {
     private readonly IDeviceDiscoveryService _discoveryService;
     private readonly IBleDeviceService _bleService;
+    private readonly AppSettings _settings;
+
+    public bool IsMockMode => _settings.UseMockBle;
 
     [ObservableProperty]
     private ConnectionPhase _phase = ConnectionPhase.PreConnect;
@@ -45,10 +49,12 @@ public partial class ConnectionViewModel : ObservableObject
 
     public ConnectionViewModel(
         IDeviceDiscoveryService discoveryService,
-        IBleDeviceService bleService)
+        IBleDeviceService bleService,
+        AppSettings settings)
     {
         _discoveryService = discoveryService;
         _bleService = bleService;
+        _settings = settings;
 
         _discoveryService.DeviceFound += OnDeviceFound;
         _discoveryService.ScanCompleted += OnScanCompleted;
@@ -120,6 +126,13 @@ public partial class ConnectionViewModel : ObservableObject
             ErrorMessage = $"Couldn't connect to {deviceName}. Make sure the device is charged and within range.";
             Phase = ConnectionPhase.ConnectionFailed;
         }
+    }
+
+    [RelayCommand]
+    private async Task SkipToConnectedAsync()
+    {
+        await _bleService.ConnectAsync();
+        Connected?.Invoke(this, "HISMITH-MOCK");
     }
 
     [RelayCommand]

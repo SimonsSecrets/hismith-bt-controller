@@ -57,6 +57,7 @@ public partial class App : Application
 
         bool useMock = settings.UseMockBle
             || e.Args.Contains("--mock", StringComparer.OrdinalIgnoreCase);
+        settings.UseMockBle = useMock;
 
         var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddDebug());
