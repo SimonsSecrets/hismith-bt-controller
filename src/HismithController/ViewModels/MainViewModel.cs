@@ -45,14 +45,20 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isStopFlashing;
 
+    [ObservableProperty]
+    private object? _activeModeContent;
+
     public ConnectionViewModel ConnectionViewModel => _connectionViewModel;
+    public ManualModeViewModel ManualModeViewModel { get; }
 
     public MainViewModel(
         IBleDeviceService bleService,
-        ConnectionViewModel connectionViewModel)
+        ConnectionViewModel connectionViewModel,
+        ManualModeViewModel manualModeViewModel)
     {
         _bleService = bleService;
         _connectionViewModel = connectionViewModel;
+        ManualModeViewModel = manualModeViewModel;
         _currentView = connectionViewModel;
 
         _connectionViewModel.Connected += OnDeviceConnected;
@@ -107,6 +113,8 @@ public partial class MainViewModel : ObservableObject
             // Best-effort stop
         }
 
+        ManualModeViewModel.ForceStop();
+
         IsStopFlashing = true;
         _stopFlashTimer?.Stop();
         _stopFlashTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
@@ -124,6 +132,13 @@ public partial class MainViewModel : ObservableObject
         ActiveMode = mode;
     }
 
+    partial void OnActiveModeChanged(string value)
+    {
+        ActiveModeContent = value == "Manual" ? (object)ManualModeViewModel : null;
+        if (value == "Manual")
+            _ = ManualModeViewModel.InitializeAsync();
+    }
+
     private void OnDeviceConnected(object? sender, string deviceName)
     {
         Application.Current.Dispatcher.InvokeAsync(() =>
@@ -132,6 +147,9 @@ public partial class MainViewModel : ObservableObject
             IsConnected = true;
             ChipState = ChipState.Connected;
             ActiveMode = "Manual";
+            // Explicitly set content in case ActiveMode didn't change (already "Manual")
+            ActiveModeContent = ManualModeViewModel;
+            _ = ManualModeViewModel.InitializeAsync();
             CurrentView = this;
         });
     }

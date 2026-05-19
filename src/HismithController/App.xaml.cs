@@ -74,6 +74,7 @@ public partial class App : Application
             services.AddSingleton<IDeviceDiscoveryService, BleDeviceDiscoveryService>();
         }
         services.AddSingleton<ConnectionViewModel>();
+        services.AddSingleton<ManualModeViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 

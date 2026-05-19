@@ -1,6 +1,9 @@
 ## Project specific
 design/
 
+## Claude
+.claude/
+
 ## Build output
 bin/
 obj/

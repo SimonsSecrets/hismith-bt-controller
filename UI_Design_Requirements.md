@@ -240,13 +240,6 @@ A row of 4 quick-preset chips below the slider, each showing both units:
 - Compact, pill-shaped chips
 - Tapping a preset sets the target speed to that value and triggers the smooth ramp to the new speed
 
-### 5.3 Power Toggle
-- A **toggle switch** labelled *"Device power"*
-- Off state: sends Power Off command (`AA 02 00 02`)
-- On state: sends Power On command (`AA 01 00 01`)
-- Default to On when mode is entered (device was just connected)
-- When toggled off, the speed slider, readouts, and presets dim to indicate the device is inactive
-
 ---
 
 ## 6. Sound Mode
