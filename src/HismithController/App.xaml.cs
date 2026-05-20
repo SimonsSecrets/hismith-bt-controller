@@ -108,7 +108,7 @@ public partial class App : Application
         var dict = new ResourceDictionary
         {
             Source = new Uri(
-                isDark ? "Themes/DarkTheme.xaml" : "Themes/LightTheme.xaml",
+                isDark ? "UI/Themes/DarkTheme.xaml" : "UI/Themes/LightTheme.xaml",
                 UriKind.Relative)
         };
         Resources.MergedDictionaries[0] = dict;

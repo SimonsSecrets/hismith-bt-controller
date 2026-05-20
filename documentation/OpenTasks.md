@@ -9,8 +9,10 @@ Ai agents may however mark tasks completed if they detect that they have complet
 
 - [ ] Device scanning: Fix icon for selected device (it is all pink, not showing the icon)
 - [ ] Connection flow: Visual step indicators should move from light rose (not active) to dark rose (executing) to green (completed)
-- [ ] Manual Mode: visual beat indicator
+- [ ] Settings menu with a button to open the logs/crashdump location
+- [ ] Save selected color theme
 
 ## Completed
 
+- [x] Manual Mode: visual beat indicator
 - [x] Manual Mode: better names for preset (more suited to the application)
