@@ -1,4 +1,5 @@
 using System.Windows;
+using HismithController.Audio;
 using HismithController.Bluetooth;
 using HismithController.Configuration;
 using HismithController.Devices;
@@ -33,7 +34,7 @@ public partial class App : Application
 
         try
         {
-        StartupCore(e);
+            StartupCore(e);
         }
         catch (Exception ex)
         {
@@ -89,6 +90,7 @@ public partial class App : Application
             services.AddSingleton<IBleDeviceService, HismithBleDeviceService>();
             services.AddSingleton<IDeviceDiscoveryService, BleDeviceDiscoveryService>();
         }
+        services.AddSingleton<IAudioCaptureService, WasapiLoopbackAudioCaptureService>();
         services.AddSingleton<IConnectedDeviceService, ConnectedDeviceService>();
         services.AddSingleton<ConnectionViewModel>();
         services.AddSingleton<ManualModeViewModel>();

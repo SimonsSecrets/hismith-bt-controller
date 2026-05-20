@@ -12,7 +12,7 @@ Design source of truth: [design/modes.jsx](design/modes.jsx) (SoundMode componen
 
 **Goal:** When the user switches to the Sound tab, the app captures system audio via loopback and renders a live spectrum visualizer. No beat detection, no device commands yet.
 
-### 1.1 Scaffold the feature folder
+### 1.1 Scaffold the feature folder ✅
 - Create `src/HismithController/Features/Audio/` with the following interfaces and types:
   - `IAudioCaptureService` — start/stop loopback capture, exposes a `SamplesAvailable` event carrying a `ReadOnlySpan<float>` of mono PCM at a known sample rate.
   - `AudioFrame` — record containing the latest mono float buffer + sample rate + timestamp.
