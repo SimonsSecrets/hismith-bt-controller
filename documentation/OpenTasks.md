@@ -11,6 +11,8 @@ Ai agents may however mark tasks completed if they detect that they have complet
 - [ ] Connection flow: Visual step indicators should move from light rose (not active) to dark rose (executing) to green (completed)
 - [ ] Settings menu with a button to open the logs/crashdump location
 - [ ] Save selected color theme
+- [ ] Mode navigation icons
+- [ ] Manual mode: pause upon entering tab, manual activation required
 
 ## Completed
 
