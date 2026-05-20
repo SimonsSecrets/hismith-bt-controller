@@ -20,6 +20,8 @@ public partial class ManualModeViewModel : ObservableObject
     private int _rampTarget;
     private int _rampDirection;
 
+    private int _currentSpeedBpm;
+
     private bool _syncingUnits;
 
     [ObservableProperty]
@@ -27,14 +29,7 @@ public partial class ManualModeViewModel : ObservableObject
     private int _targetSpeedBpm;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CurrentSpeedPercent))]
-    private int _currentSpeedBpm;
-
-    [ObservableProperty]
     private int _maxBpm = 100;
-
-    [ObservableProperty]
-    private bool _isRamping;
 
     [ObservableProperty]
     private bool _isTargetReached;
@@ -42,8 +37,6 @@ public partial class ManualModeViewModel : ObservableObject
     public ObservableCollection<PresetItem> Presets { get; } = [];
 
     public int TargetSpeedPercent => Device?.BpmToPercent(TargetSpeedBpm) ?? 0;
-
-    public int CurrentSpeedPercent => Device?.BpmToPercent(CurrentSpeedBpm) ?? 0;
 
     private IDevice? Device => _connectedDevice.CurrentDevice;
 
@@ -69,7 +62,6 @@ public partial class ManualModeViewModel : ObservableObject
         }
         UpdatePresetActiveStates();
         OnPropertyChanged(nameof(TargetSpeedPercent));
-        OnPropertyChanged(nameof(CurrentSpeedPercent));
     }
 
     partial void OnTargetSpeedBpmChanged(int value)
@@ -94,6 +86,11 @@ public partial class ManualModeViewModel : ObservableObject
     private void SetPreset(PresetItem preset)
     {
         if (preset is null) return;
+        _syncingUnits = true;
+        TargetSpeedBpm = preset.Bpm;
+        _syncingUnits = false;
+        UpdatePresetActiveStates();
+        _debounceTimer?.Stop();
         BeginRamp(preset.Bpm);
     }
 
@@ -102,9 +99,8 @@ public partial class ManualModeViewModel : ObservableObject
         StopRamp();
         _syncingUnits = true;
         TargetSpeedBpm = 0;
-        CurrentSpeedBpm = 0;
+        _currentSpeedBpm = 0;
         _syncingUnits = false;
-        IsRamping = false;
         IsTargetReached = false;
         ApplyDevice(Device);
         return Task.CompletedTask;
@@ -123,7 +119,7 @@ public partial class ManualModeViewModel : ObservableObject
         StopRamp();
         _syncingUnits = true;
         TargetSpeedBpm = 0;
-        CurrentSpeedBpm = 0;
+        _currentSpeedBpm = 0;
         _syncingUnits = false;
         UpdatePresetActiveStates();
     }
@@ -154,7 +150,7 @@ public partial class ManualModeViewModel : ObservableObject
         newTarget = Math.Clamp(newTarget, 0, MaxBpm);
         StopRamp();
 
-        _rampStart = CurrentSpeedBpm;
+        _rampStart = _currentSpeedBpm;
         _rampTarget = newTarget;
         int delta = Math.Abs(newTarget - _rampStart);
 
@@ -172,7 +168,6 @@ public partial class ManualModeViewModel : ObservableObject
         int ticksNeeded = Math.Max(durationMs / 50, 1);
         _rampStep = (double)delta / ticksNeeded;
 
-        IsRamping = true;
         _rampTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _rampTimer.Tick += OnRampTick;
         _rampTimer.Start();
@@ -186,14 +181,13 @@ public partial class ManualModeViewModel : ObservableObject
             Math.Min(_rampStart, _rampTarget),
             Math.Max(_rampStart, _rampTarget));
 
-        CurrentSpeedBpm = newSpeed;
+        _currentSpeedBpm = newSpeed;
         if (Device is { } device)
             _ = device.SetTargetBpmAsync(newSpeed);
 
         if (newSpeed == _rampTarget)
         {
             StopRamp();
-            IsRamping = false;
             TriggerPulse();
         }
     }

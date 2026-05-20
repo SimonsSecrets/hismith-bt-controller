@@ -124,20 +124,27 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bg"
-                            Background="{DynamicResource StopButtonBrush}"
-                            CornerRadius="12"
-                            Padding="{TemplateBinding Padding}"
-                            SnapsToDevicePixels="True">
+                    <Grid>
+                        <Border x:Name="Bg"
+                                Background="{DynamicResource StopButtonBrush}"
+                                CornerRadius="12"
+                                SnapsToDevicePixels="True" />
+                        <Border x:Name="FlashBg"
+                                Background="{DynamicResource SageBrush}"
+                                CornerRadius="12"
+                                Opacity="0"
+                                IsHitTestVisible="False"
+                                SnapsToDevicePixels="True" />
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
-                                    VerticalAlignment="Center">
+                                    VerticalAlignment="Center"
+                                    Margin="{TemplateBinding Padding}">
                             <!-- Stop icon (filled square) -->
                             <Border Width="14" Height="14" CornerRadius="2"
                                     Background="White" Margin="0,0,10,0" />
                             <ContentPresenter VerticalAlignment="Center" />
                         </StackPanel>
-                    </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bg" Property="Background"
@@ -149,6 +156,26 @@
                             <Setter Property="Foreground"
                                     Value="{DynamicResource StopButtonDisabledForegroundBrush}" />
                         </Trigger>
+                        <DataTrigger Binding="{Binding IsStopFlashing}" Value="True">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="FlashBg"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1" Duration="0:0:0.16" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                            <DataTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="FlashBg"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0" Duration="0:0:0.4" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>

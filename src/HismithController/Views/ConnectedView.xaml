@@ -27,16 +27,8 @@
             <DockPanel>
                 <!-- Stop button -->
                 <Button x:Name="StopBtn" DockPanel.Dock="Left"
+                        Style="{StaticResource StopButton}"
                         Command="{Binding EmergencyStopCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource StopButton}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsStopFlashing}" Value="True">
-                                    <Setter Property="Background" Value="{DynamicResource CoralBrush}" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
                     <TextBlock x:Name="StopText">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
