@@ -1,6 +1,6 @@
+using HismithController.Services;
 using Microsoft.Extensions.Logging;
 using Windows.Devices.Bluetooth;
-using Windows.Devices.Bluetooth.Advertisement;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
 using Windows.Storage.Streams;
 
@@ -11,7 +11,6 @@ public sealed class HismithBleDeviceService : IBleDeviceService
     private readonly ILogger<HismithBleDeviceService> _logger;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
-    private BluetoothLEAdvertisementWatcher? _watcher;
     private BluetoothLEDevice? _device;
     private GattCharacteristic? _txCharacteristic;
     private BleConnectionState _connectionState = BleConnectionState.Disconnected;
@@ -26,80 +25,74 @@ public sealed class HismithBleDeviceService : IBleDeviceService
 
     public event EventHandler<BleDeviceStatus>? StatusChanged;
 
-    public async Task ConnectAsync(CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(DiscoveredDevice device, CancellationToken cancellationToken = default)
     {
         if (_connectionState == BleConnectionState.Connected)
             return;
 
-        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var ctReg = cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
-
-        _watcher = new BluetoothLEAdvertisementWatcher
-        {
-            ScanningMode = BluetoothLEScanningMode.Active
-        };
-
-        SetState(BleConnectionState.Scanning);
-
-        _watcher.Received += async (_, args) =>
-        {
-            if (tcs.Task.IsCompleted)
-                return;
-
-            var name = args.Advertisement.LocalName;
-            if (!HismithProtocol.DeviceAdvertisementName.Equals(name, StringComparison.OrdinalIgnoreCase))
-                return;
-
-            if (Interlocked.CompareExchange(ref _connectionInProgress, 1, 0) != 0)
-                return;
-
-            _watcher?.Stop();
-            _logger.LogInformation("Found device {Name} at {Address:X12}", name, args.BluetoothAddress);
-
-            try
-            {
-                SetState(BleConnectionState.Connecting);
-                await ConnectToDeviceAsync(args.BluetoothAddress);
-                tcs.TrySetResult(true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to connect to device");
-                CleanupDeviceResources();
-                SetState(BleConnectionState.Error, errorMessage: ex.Message);
-                tcs.TrySetException(ex);
-            }
-            finally
-            {
-                Interlocked.Exchange(ref _connectionInProgress, 0);
-            }
-        };
-
-        _watcher.Stopped += (_, args) =>
-        {
-            if (args.Error == BluetoothError.RadioNotAvailable)
-            {
-                var msg = "Bluetooth is not available. Enable Bluetooth in Windows Settings.";
-                _logger.LogError(msg);
-                SetState(BleConnectionState.Error, errorMessage: msg);
-                tcs.TrySetException(new InvalidOperationException(msg));
-            }
-        };
-
-        _watcher.Start();
+        if (Interlocked.CompareExchange(ref _connectionInProgress, 1, 0) != 0)
+            throw new InvalidOperationException("A connection attempt is already in progress.");
 
         try
         {
-            await tcs.Task;
+            SetState(BleConnectionState.Connecting);
+            var address = ParseBluetoothAddress(device.Address);
+            _logger.LogInformation("Connecting to {Name} at {Address}", device.Name, device.Address);
+            await ConnectToDeviceAsync(address);
         }
-        catch (OperationCanceledException)
+        catch (Exception ex)
         {
-            _watcher?.Stop();
-            _watcher = null;
-            Interlocked.Exchange(ref _connectionInProgress, 0);
-            SetState(BleConnectionState.Disconnected);
+            _logger.LogError(ex, "Failed to connect to device");
+            CleanupDeviceResources();
+            SetState(BleConnectionState.Error, errorMessage: ex.Message);
             throw;
         }
+        finally
+        {
+            Interlocked.Exchange(ref _connectionInProgress, 0);
+        }
+    }
+
+    private static ulong ParseBluetoothAddress(string formatted)
+    {
+        var hex = formatted.Replace(":", string.Empty, StringComparison.Ordinal);
+        return ulong.Parse(hex, System.Globalization.NumberStyles.HexNumber);
+    }
+
+    public async Task<ushort> GetProductCodeAsync(CancellationToken cancellationToken = default)
+    {
+        var device = _device
+            ?? throw new InvalidOperationException("Not connected to device.");
+
+        var servicesResult = await device.GetGattServicesForUuidAsync(
+            HismithProtocol.InfoServiceUuid, BluetoothCacheMode.Uncached);
+
+        if (servicesResult.Status != GattCommunicationStatus.Success || servicesResult.Services.Count == 0)
+            throw new InvalidOperationException(
+                $"Info service {HismithProtocol.InfoServiceUuid} not found (status: {servicesResult.Status}).");
+
+        var service = servicesResult.Services[0];
+        var charsResult = await service.GetCharacteristicsForUuidAsync(
+            HismithProtocol.ModelCharacteristicUuid, BluetoothCacheMode.Uncached);
+
+        if (charsResult.Status != GattCommunicationStatus.Success || charsResult.Characteristics.Count == 0)
+            throw new InvalidOperationException(
+                $"Model characteristic {HismithProtocol.ModelCharacteristicUuid} not found (status: {charsResult.Status}).");
+
+        var readResult = await charsResult.Characteristics[0].ReadValueAsync(BluetoothCacheMode.Uncached);
+        if (readResult.Status != GattCommunicationStatus.Success)
+            throw new InvalidOperationException(
+                $"Failed to read model characteristic (status: {readResult.Status}).");
+
+        var reader = DataReader.FromBuffer(readResult.Value);
+        reader.ByteOrder = ByteOrder.LittleEndian;
+        if (reader.UnconsumedBufferLength < sizeof(ushort))
+            throw new InvalidOperationException(
+                $"Model characteristic returned {reader.UnconsumedBufferLength} bytes (expected ≥ 2).");
+
+        var code = reader.ReadUInt16();
+        _logger.LogInformation("Device product code: 0x{Code:X4}", code);
+        return code;
     }
 
     private async Task ConnectToDeviceAsync(ulong bluetoothAddress)
@@ -225,9 +218,6 @@ public sealed class HismithBleDeviceService : IBleDeviceService
             _device.Dispose();
             _device = null;
         }
-
-        _watcher?.Stop();
-        _watcher = null;
     }
 
     private void SetState(BleConnectionState state, string deviceName = "",

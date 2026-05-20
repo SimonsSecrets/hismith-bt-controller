@@ -1,6 +1,7 @@
 using System.Windows;
 using HismithController.Bluetooth;
 using HismithController.Configuration;
+using HismithController.Devices;
 using HismithController.Services;
 using HismithController.ViewModels;
 using Microsoft.Extensions.Configuration;
@@ -73,6 +74,7 @@ public partial class App : Application
             services.AddSingleton<IBleDeviceService, HismithBleDeviceService>();
             services.AddSingleton<IDeviceDiscoveryService, BleDeviceDiscoveryService>();
         }
+        services.AddSingleton<IConnectedDeviceService, ConnectedDeviceService>();
         services.AddSingleton<ConnectionViewModel>();
         services.AddSingleton<ManualModeViewModel>();
         services.AddSingleton<MainViewModel>();

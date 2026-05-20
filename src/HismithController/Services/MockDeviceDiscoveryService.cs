@@ -5,7 +5,7 @@ public sealed class MockDeviceDiscoveryService : IDeviceDiscoveryService
     private static readonly DiscoveredDevice[] MockDevices =
     [
         new("hi1", "HISMITH", "A4:C1:38:9F:21:E2", 3),
-        new("hi2", "HISMITH", "A4:C1:38:7B:0C:18", 2),
+        new("hi2", "HISMITH-MINI", "A4:C1:38:7B:0C:18", 2),
         new("u1", "Unknown device", "5C:F3:70:11:8A:9D", 1),
     ];
 

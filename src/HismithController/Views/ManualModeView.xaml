@@ -63,13 +63,15 @@
                     </Border>
                     <!-- Content -->
                     <StackPanel>
-                        <TextBox Text="{Binding TargetSpeedPercent, UpdateSourceTrigger=LostFocus}"
+                        <TextBox x:Name="PercentField"
+                                 Text="{Binding TargetSpeedPercent, Mode=OneWay}"
                                  FontSize="40" FontWeight="Light"
                                  Foreground="{DynamicResource TextBrush}"
                                  Background="Transparent" BorderThickness="0"
                                  TextAlignment="Center" CaretBrush="{DynamicResource RoseBrush}"
                                  SelectionBrush="{DynamicResource RoseSoftBrush}"
-                                 Padding="0" KeyDown="OnNumFieldKeyDown" />
+                                 Padding="0" KeyDown="OnPercentFieldKeyDown"
+                                 LostKeyboardFocus="OnPercentFieldLostFocus" />
                         <TextBlock Text="SPEED (%)"
                                    FontSize="11" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDimBrush}"
@@ -155,8 +157,8 @@
         </StackPanel>
 
         <!-- ========== SLIDER ========== -->
-        <Slider Minimum="0" Maximum="100"
-                Value="{Binding TargetSpeedPercent, Mode=TwoWay}"
+        <Slider Minimum="0" Maximum="{Binding MaxBpm}"
+                Value="{Binding TargetSpeedBpm, Mode=TwoWay}"
                 Style="{StaticResource ManualSpeedSlider}"
                 Margin="0,20,0,0" Height="28"
                 Thumb.DragCompleted="OnSliderDragCompleted" />
@@ -170,129 +172,38 @@
                    Foreground="{DynamicResource TextDimBrush}"
                    Margin="0,0,0,10" />
 
-        <WrapPanel>
-
-            <!-- Lazy · 10% · 24 BPM -->
-            <Button Command="{Binding SetPresetCommand}" CommandParameter="10">
-                <Button.Style>
-                    <Style TargetType="Button" BasedOn="{StaticResource PresetChip}">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsLazyPreset}" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource RoseTintBrush}" />
-                                <Setter Property="BorderBrush" Value="{DynamicResource RoseBrush}" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Lazy" FontSize="12.5" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextBrush}" />
-                    <TextBlock Text="  ·  30 BPM" FontSize="12.5"
-                               Foreground="{DynamicResource TextDimBrush}" />
-                </StackPanel>
-            </Button>
-
-            <!-- Gentle · 25% · 60 BPM -->
-            <Button Command="{Binding SetPresetCommand}" CommandParameter="25">
-                <Button.Style>
-                    <Style TargetType="Button" BasedOn="{StaticResource PresetChip}">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsGentlePreset}" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource RoseTintBrush}" />
-                                <Setter Property="BorderBrush" Value="{DynamicResource RoseBrush}" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Gentle" FontSize="12.5" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextBrush}" />
-                    <TextBlock Text="  ·  60 BPM" FontSize="12.5"
-                               Foreground="{DynamicResource TextDimBrush}" />
-                </StackPanel>
-            </Button>
-
-            <!-- Pleasurable · 40% · 96 BPM -->
-            <Button Command="{Binding SetPresetCommand}" CommandParameter="40">
-                <Button.Style>
-                    <Style TargetType="Button" BasedOn="{StaticResource PresetChip}">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsPleasurablePreset}" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource RoseTintBrush}" />
-                                <Setter Property="BorderBrush" Value="{DynamicResource RoseBrush}" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Pleasurable" FontSize="12.5" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextBrush}" />
-                    <TextBlock Text="  ·  90 BPM" FontSize="12.5"
-                               Foreground="{DynamicResource TextDimBrush}" />
-                </StackPanel>
-            </Button>
-
-            <!-- Intense · 50% · 120 BPM -->
-            <Button Command="{Binding SetPresetCommand}" CommandParameter="50">
-                <Button.Style>
-                    <Style TargetType="Button" BasedOn="{StaticResource PresetChip}">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsIntensePreset}" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource RoseTintBrush}" />
-                                <Setter Property="BorderBrush" Value="{DynamicResource RoseBrush}" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Intense" FontSize="12.5" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextBrush}" />
-                    <TextBlock Text="  ·  120 BPM" FontSize="12.5"
-                               Foreground="{DynamicResource TextDimBrush}" />
-                </StackPanel>
-            </Button>
-
-            <!-- Rough · 75% · 180 BPM -->
-            <Button Command="{Binding SetPresetCommand}" CommandParameter="75">
-                <Button.Style>
-                    <Style TargetType="Button" BasedOn="{StaticResource PresetChip}">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsRoughPreset}" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource RoseTintBrush}" />
-                                <Setter Property="BorderBrush" Value="{DynamicResource RoseBrush}" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Rough" FontSize="12.5" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextBrush}" />
-                    <TextBlock Text="  ·  180 BPM" FontSize="12.5"
-                               Foreground="{DynamicResource TextDimBrush}" />
-                </StackPanel>
-            </Button>
-
-            <!-- Destroyed · 100% · 240 BPM -->
-            <Button Command="{Binding SetPresetCommand}" CommandParameter="100">
-                <Button.Style>
-                    <Style TargetType="Button" BasedOn="{StaticResource PresetChip}">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsDestroyedPreset}" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource RoseTintBrush}" />
-                                <Setter Property="BorderBrush" Value="{DynamicResource RoseBrush}" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Destroyed" FontSize="12.5" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextBrush}" />
-                    <TextBlock Text="  ·  240 BPM" FontSize="12.5"
-                               Foreground="{DynamicResource TextDimBrush}" />
-                </StackPanel>
-            </Button>
-
-        </WrapPanel>
+        <ItemsControl ItemsSource="{Binding Presets}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Button Command="{Binding DataContext.SetPresetCommand,
+                                              RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PresetChip}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource RoseTintBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource RoseBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextBrush}" />
+                            <TextBlock Text="{Binding Bpm, StringFormat='  ·  {0} BPM'}"
+                                       FontSize="12.5"
+                                       Foreground="{DynamicResource TextDimBrush}" />
+                        </StackPanel>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
     </StackPanel>
 </UserControl>

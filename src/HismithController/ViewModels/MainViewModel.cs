@@ -3,6 +3,7 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HismithController.Bluetooth;
+using HismithController.Devices;
 
 namespace HismithController.ViewModels;
 
@@ -18,6 +19,7 @@ public enum ChipState
 public partial class MainViewModel : ObservableObject
 {
     private readonly IBleDeviceService _bleService;
+    private readonly IConnectedDeviceService _connectedDevice;
     private readonly ConnectionViewModel _connectionViewModel;
     private DispatcherTimer? _stopFlashTimer;
 
@@ -53,10 +55,12 @@ public partial class MainViewModel : ObservableObject
 
     public MainViewModel(
         IBleDeviceService bleService,
+        IConnectedDeviceService connectedDevice,
         ConnectionViewModel connectionViewModel,
         ManualModeViewModel manualModeViewModel)
     {
         _bleService = bleService;
+        _connectedDevice = connectedDevice;
         _connectionViewModel = connectionViewModel;
         ManualModeViewModel = manualModeViewModel;
         _currentView = connectionViewModel;
@@ -90,7 +94,7 @@ public partial class MainViewModel : ObservableObject
     private async Task DisconnectAsync()
     {
         IsPopoverOpen = false;
-        await _bleService.DisconnectAsync();
+        await _connectedDevice.DisconnectAsync();
         IsConnected = false;
         DeviceName = string.Empty;
         ChipState = ChipState.Disconnected;
@@ -106,7 +110,8 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            await _bleService.SendSpeedAsync(0);
+            if (_connectedDevice.CurrentDevice is { } device)
+                await device.SetTargetBpmAsync(0);
         }
         catch
         {

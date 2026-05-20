@@ -1,3 +1,5 @@
+using HismithController.Services;
+
 namespace HismithController.Bluetooth;
 
 public interface IBleDeviceService : IAsyncDisposable
@@ -6,7 +8,9 @@ public interface IBleDeviceService : IAsyncDisposable
 
     event EventHandler<BleDeviceStatus> StatusChanged;
 
-    Task ConnectAsync(CancellationToken cancellationToken = default);
+    Task ConnectAsync(DiscoveredDevice device, CancellationToken cancellationToken = default);
+
+    Task<ushort> GetProductCodeAsync(CancellationToken cancellationToken = default);
 
     Task SendSpeedAsync(byte speed, CancellationToken cancellationToken = default);
 

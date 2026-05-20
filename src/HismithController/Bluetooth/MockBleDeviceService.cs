@@ -1,11 +1,24 @@
+using HismithController.Services;
 using Microsoft.Extensions.Logging;
 
 namespace HismithController.Bluetooth;
 
 public sealed class MockBleDeviceService : IBleDeviceService
 {
+    // Hismith AK Series (Pro 1) — verified with a real device on 2026-05-18.
+    public const ushort ProductCodeAkSeries = 0x1001;
+
+    // Made-up product code used only for the 100-BPM mock device, so the
+    // product-code lookup path is exercised in mock mode.
+    public const ushort ProductCodeMockMini = 0xFF01;
+
+    // Returned for any mock peripheral that isn't a known Hismith model, so
+    // the IncompatibleDevice path can be exercised in mock mode.
+    public const ushort ProductCodeUnknown = 0x0000;
+
     private readonly ILogger<MockBleDeviceService> _logger;
     private BleConnectionState _connectionState = BleConnectionState.Disconnected;
+    private DiscoveredDevice? _connectedDevice;
 
     public MockBleDeviceService(ILogger<MockBleDeviceService> logger)
     {
@@ -16,14 +29,31 @@ public sealed class MockBleDeviceService : IBleDeviceService
 
     public event EventHandler<BleDeviceStatus>? StatusChanged;
 
-    public async Task ConnectAsync(CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(DiscoveredDevice device, CancellationToken cancellationToken = default)
     {
         SetState(BleConnectionState.Scanning);
         await Task.Delay(500, cancellationToken);
         SetState(BleConnectionState.Connecting);
         await Task.Delay(300, cancellationToken);
-        SetState(BleConnectionState.Connected, "HISMITH-MOCK");
-        _logger.LogInformation("[MOCK] Connected to simulated device");
+        _connectedDevice = device;
+        SetState(BleConnectionState.Connected, device.Name);
+        _logger.LogInformation("[MOCK] Connected to simulated device {Name}", device.Name);
+    }
+
+    public Task<ushort> GetProductCodeAsync(CancellationToken cancellationToken = default)
+    {
+        EnsureConnected();
+        var name = _connectedDevice?.Name ?? string.Empty;
+        ushort code = name switch
+        {
+            _ when name.Equals("HISMITH", StringComparison.OrdinalIgnoreCase) => ProductCodeAkSeries,
+            _ when name.Equals("HISMITH-MINI", StringComparison.OrdinalIgnoreCase) => ProductCodeMockMini,
+            // Any other peripheral (e.g. the "Unknown device" mock entry) returns
+            // a code the catalog doesn't recognise — surfaces as IncompatibleDevice.
+            _ => ProductCodeUnknown,
+        };
+        _logger.LogInformation("[MOCK] Product code for {Name}: 0x{Code:X4}", name, code);
+        return Task.FromResult(code);
     }
 
     public Task SendSpeedAsync(byte speed, CancellationToken cancellationToken = default)
@@ -50,6 +80,7 @@ public sealed class MockBleDeviceService : IBleDeviceService
 
     public Task DisconnectAsync()
     {
+        _connectedDevice = null;
         SetState(BleConnectionState.Disconnected);
         _logger.LogInformation("[MOCK] Disconnected");
         return Task.CompletedTask;
@@ -67,7 +98,7 @@ public sealed class MockBleDeviceService : IBleDeviceService
             throw new InvalidOperationException("Not connected to device.");
     }
 
-    private void SetState(BleConnectionState state, string deviceName = "HISMITH-MOCK",
+    private void SetState(BleConnectionState state, string deviceName = "HISMITH",
         string? errorMessage = null)
     {
         _connectionState = state;

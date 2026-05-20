@@ -1,13 +1,14 @@
+using System.Collections.ObjectModel;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using HismithController.Bluetooth;
+using HismithController.Devices;
 
 namespace HismithController.ViewModels;
 
 public partial class ManualModeViewModel : ObservableObject
 {
-    private readonly IBleDeviceService _bleService;
+    private readonly IConnectedDeviceService _connectedDevice;
 
     private DispatcherTimer? _rampTimer;
     private DispatcherTimer? _debounceTimer;
@@ -22,26 +23,15 @@ public partial class ManualModeViewModel : ObservableObject
     private bool _syncingUnits;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsLazyPreset))]
-    [NotifyPropertyChangedFor(nameof(IsGentlePreset))]
-    [NotifyPropertyChangedFor(nameof(IsPleasurablePreset))]
-    [NotifyPropertyChangedFor(nameof(IsIntensePreset))]
-    [NotifyPropertyChangedFor(nameof(IsRoughPreset))]
-    [NotifyPropertyChangedFor(nameof(IsDestroyedPreset))]
-    private int _targetSpeedPercent;
-
-    public bool IsLazyPreset => TargetSpeedPercent == 10;
-    public bool IsGentlePreset => TargetSpeedPercent == 25;
-    public bool IsPleasurablePreset => TargetSpeedPercent == 40;
-    public bool IsIntensePreset => TargetSpeedPercent == 50;
-    public bool IsRoughPreset => TargetSpeedPercent == 75;
-    public bool IsDestroyedPreset => TargetSpeedPercent == 100;
-
-    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TargetSpeedPercent))]
     private int _targetSpeedBpm;
 
     [ObservableProperty]
-    private int _currentSpeedPercent;
+    [NotifyPropertyChangedFor(nameof(CurrentSpeedPercent))]
+    private int _currentSpeedBpm;
+
+    [ObservableProperty]
+    private int _maxBpm = 100;
 
     [ObservableProperty]
     private bool _isRamping;
@@ -49,46 +39,74 @@ public partial class ManualModeViewModel : ObservableObject
     [ObservableProperty]
     private bool _isTargetReached;
 
-    public ManualModeViewModel(IBleDeviceService bleService)
+    public ObservableCollection<PresetItem> Presets { get; } = [];
+
+    public int TargetSpeedPercent => Device?.BpmToPercent(TargetSpeedBpm) ?? 0;
+
+    public int CurrentSpeedPercent => Device?.BpmToPercent(CurrentSpeedBpm) ?? 0;
+
+    private IDevice? Device => _connectedDevice.CurrentDevice;
+
+    public ManualModeViewModel(IConnectedDeviceService connectedDevice)
     {
-        _bleService = bleService;
+        _connectedDevice = connectedDevice;
+        _connectedDevice.DeviceChanged += (_, device) => ApplyDevice(device);
+        ApplyDevice(_connectedDevice.CurrentDevice);
     }
 
-    partial void OnTargetSpeedPercentChanged(int value)
+    private void ApplyDevice(IDevice? device)
     {
-        if (_syncingUnits) return;
-        _syncingUnits = true;
-        TargetSpeedBpm = value * 240 / 100;
-        _syncingUnits = false;
-        RestartDebounce();
+        Presets.Clear();
+        if (device is not null)
+        {
+            MaxBpm = device.MaxBpm;
+            foreach (var preset in device.Presets)
+                Presets.Add(new PresetItem(preset.Name, preset.Bpm));
+        }
+        else
+        {
+            MaxBpm = 100;
+        }
+        UpdatePresetActiveStates();
+        OnPropertyChanged(nameof(TargetSpeedPercent));
+        OnPropertyChanged(nameof(CurrentSpeedPercent));
     }
 
     partial void OnTargetSpeedBpmChanged(int value)
     {
         if (_syncingUnits) return;
+        UpdatePresetActiveStates();
+        RestartDebounce();
+    }
+
+    // Allow the % textbox to write back to BPM via the device's mapping.
+    public void SetTargetFromPercent(int percent)
+    {
+        if (Device is null) return;
         _syncingUnits = true;
-        TargetSpeedPercent = value * 100 / 240;
+        TargetSpeedBpm = Device.PercentToBpm(percent);
         _syncingUnits = false;
+        UpdatePresetActiveStates();
         RestartDebounce();
     }
 
     [RelayCommand]
-    private void SetPreset(string pctStr)
+    private void SetPreset(PresetItem preset)
     {
-        if (int.TryParse(pctStr, out int pct))
-            BeginRamp(pct);
+        if (preset is null) return;
+        BeginRamp(preset.Bpm);
     }
 
     public Task InitializeAsync()
     {
         StopRamp();
         _syncingUnits = true;
-        TargetSpeedPercent = 0;
         TargetSpeedBpm = 0;
-        CurrentSpeedPercent = 0;
+        CurrentSpeedBpm = 0;
         _syncingUnits = false;
         IsRamping = false;
         IsTargetReached = false;
+        ApplyDevice(Device);
         return Task.CompletedTask;
     }
 
@@ -96,7 +114,7 @@ public partial class ManualModeViewModel : ObservableObject
     public void CommitSliderValue()
     {
         _debounceTimer?.Stop();
-        BeginRamp(TargetSpeedPercent);
+        BeginRamp(TargetSpeedBpm);
     }
 
     // Called by MainViewModel emergency stop.
@@ -104,10 +122,16 @@ public partial class ManualModeViewModel : ObservableObject
     {
         StopRamp();
         _syncingUnits = true;
-        TargetSpeedPercent = 0;
         TargetSpeedBpm = 0;
-        CurrentSpeedPercent = 0;
+        CurrentSpeedBpm = 0;
         _syncingUnits = false;
+        UpdatePresetActiveStates();
+    }
+
+    private void UpdatePresetActiveStates()
+    {
+        foreach (var preset in Presets)
+            preset.IsActive = preset.Bpm == TargetSpeedBpm;
     }
 
     private void RestartDebounce()
@@ -118,7 +142,7 @@ public partial class ManualModeViewModel : ObservableObject
             _debounceTimer.Tick += (_, _) =>
             {
                 _debounceTimer.Stop();
-                BeginRamp(TargetSpeedPercent);
+                BeginRamp(TargetSpeedBpm);
             };
         }
         _debounceTimer.Stop();
@@ -127,10 +151,10 @@ public partial class ManualModeViewModel : ObservableObject
 
     private void BeginRamp(int newTarget)
     {
-        newTarget = Math.Clamp(newTarget, 0, 100);
+        newTarget = Math.Clamp(newTarget, 0, MaxBpm);
         StopRamp();
 
-        _rampStart = CurrentSpeedPercent;
+        _rampStart = CurrentSpeedBpm;
         _rampTarget = newTarget;
         int delta = Math.Abs(newTarget - _rampStart);
 
@@ -143,8 +167,9 @@ public partial class ManualModeViewModel : ObservableObject
         _rampDirection = Math.Sign(newTarget - _rampStart);
         _rampPosition = 0;
 
-        int durationMs = Math.Clamp(delta * 12, 500, 1500);
-        int ticksNeeded = durationMs / 50;
+        // Scale ramp duration relative to MaxBpm so it feels the same across devices.
+        int durationMs = Math.Clamp(delta * 1200 / Math.Max(MaxBpm, 1), 500, 1500);
+        int ticksNeeded = Math.Max(durationMs / 50, 1);
         _rampStep = (double)delta / ticksNeeded;
 
         IsRamping = true;
@@ -161,8 +186,9 @@ public partial class ManualModeViewModel : ObservableObject
             Math.Min(_rampStart, _rampTarget),
             Math.Max(_rampStart, _rampTarget));
 
-        CurrentSpeedPercent = newSpeed;
-        _ = _bleService.SendSpeedAsync((byte)newSpeed);
+        CurrentSpeedBpm = newSpeed;
+        if (Device is { } device)
+            _ = device.SetTargetBpmAsync(newSpeed);
 
         if (newSpeed == _rampTarget)
         {
