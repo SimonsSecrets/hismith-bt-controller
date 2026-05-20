@@ -42,7 +42,7 @@ Mocking BLE and mocking audio are independent concerns and should be controllabl
 
 Implement `MockAudioCaptureService` to generate a 120 BPM kick-style pulse + pink noise mix at 44.1 kHz mono, so the visualizer and beat detector have a deterministic signal to lock onto.
 
-### 1.3 Spectrum data pipeline
+### 1.3 Spectrum data pipeline ✅
 - Add a `SpectrumAnalyzer` class (in the same folder) that maintains a rolling FFT over the incoming mono samples:
   - FFT size 1024, hop 512 (≈11.6 ms hop at 44.1 kHz), Hann window.
   - Output ~56 logarithmically-grouped magnitude bins to match the 56-bar visualizer in `modes.jsx`.

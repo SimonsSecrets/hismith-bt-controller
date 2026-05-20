@@ -102,6 +102,7 @@ public partial class App : Application
             services.AddSingleton<IAudioCaptureService, MockAudioCaptureService>();
         else
             services.AddSingleton<IAudioCaptureService, WasapiLoopbackAudioCaptureService>();
+        services.AddSingleton<SpectrumAnalyzer>();
         services.AddSingleton<IConnectedDeviceService, ConnectedDeviceService>();
         services.AddSingleton<ConnectionViewModel>();
         services.AddSingleton<ManualModeViewModel>();
