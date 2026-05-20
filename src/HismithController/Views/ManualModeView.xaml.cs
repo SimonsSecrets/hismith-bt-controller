@@ -1,15 +1,63 @@
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
 using HismithController.ViewModels;
 
 namespace HismithController.Views;
 
 public partial class ManualModeView : UserControl
 {
+    private ManualModeViewModel? _subscribedVm;
+
     public ManualModeView()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
+        Unloaded += (_, _) => UnsubscribeBeatPulse();
+        HookBeatPulse(DataContext as ManualModeViewModel);
+    }
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        => HookBeatPulse(e.NewValue as ManualModeViewModel);
+
+    private void HookBeatPulse(ManualModeViewModel? vm)
+    {
+        UnsubscribeBeatPulse();
+        if (vm is null) return;
+        _subscribedVm = vm;
+        vm.BeatPulse += OnBeatPulse;
+    }
+
+    private void UnsubscribeBeatPulse()
+    {
+        if (_subscribedVm is null) return;
+        _subscribedVm.BeatPulse -= OnBeatPulse;
+        _subscribedVm = null;
+    }
+
+    private void OnBeatPulse()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(OnBeatPulse);
+            return;
+        }
+        RunRingPulse(PercentBeatRing);
+        RunRingPulse(BpmBeatRing);
+    }
+
+    private static void RunRingPulse(Border ring)
+    {
+        var anim = new DoubleAnimation
+        {
+            From = 0.85,
+            To = 0,
+            Duration = TimeSpan.FromMilliseconds(360),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        ring.BeginAnimation(UIElement.OpacityProperty, anim);
     }
 
     private void OnSliderDragStarted(object sender, DragStartedEventArgs e)

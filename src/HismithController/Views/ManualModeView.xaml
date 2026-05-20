@@ -41,26 +41,15 @@
                     </Style>
                 </Border.Style>
                 <Grid>
-                    <!-- Pulse overlay -->
-                    <Border CornerRadius="8" Background="{DynamicResource RoseSoftBrush}"
-                            IsHitTestVisible="False" Opacity="0" Margin="-18,-14">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsTargetReached}" Value="True">
-                                        <DataTrigger.EnterActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                     From="1" To="0" Duration="0:0:1.1" />
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </DataTrigger.EnterActions>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                    </Border>
+                    <!-- Beat-pulse ring overlay -->
+                    <Border x:Name="PercentBeatRing"
+                            CornerRadius="10"
+                            BorderBrush="{DynamicResource RoseBrush}"
+                            BorderThickness="2"
+                            Background="Transparent"
+                            IsHitTestVisible="False"
+                            Opacity="0"
+                            Margin="-19,-15" />
                     <!-- Content -->
                     <StackPanel>
                         <TextBox x:Name="PercentField"
@@ -98,26 +87,15 @@
                     </Style>
                 </Border.Style>
                 <Grid>
-                    <!-- Pulse overlay -->
-                    <Border CornerRadius="8" Background="{DynamicResource RoseSoftBrush}"
-                            IsHitTestVisible="False" Opacity="0" Margin="-18,-14">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsTargetReached}" Value="True">
-                                        <DataTrigger.EnterActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                     From="1" To="0" Duration="0:0:1.1" />
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </DataTrigger.EnterActions>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                    </Border>
+                    <!-- Beat-pulse ring overlay -->
+                    <Border x:Name="BpmBeatRing"
+                            CornerRadius="10"
+                            BorderBrush="{DynamicResource RoseBrush}"
+                            BorderThickness="2"
+                            Background="Transparent"
+                            IsHitTestVisible="False"
+                            Opacity="0"
+                            Margin="-19,-15" />
                     <!-- Content -->
                     <StackPanel>
                         <TextBox x:Name="BpmField"

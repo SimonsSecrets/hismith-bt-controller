@@ -12,7 +12,9 @@ public partial class ManualModeViewModel : ObservableObject
 
     private DispatcherTimer? _rampTimer;
     private DispatcherTimer? _bleWriteDebounce;
-    private DispatcherTimer? _pulseResetTimer;
+    private DispatcherTimer? _beatPulseTimer;
+
+    public event Action? BeatPulse;
 
     private double _rampPosition;
     private double _rampStep;
@@ -39,9 +41,6 @@ public partial class ManualModeViewModel : ObservableObject
 
     [ObservableProperty]
     private int _maxBpm = 100;
-
-    [ObservableProperty]
-    private bool _isTargetReached;
 
     [ObservableProperty]
     private string _bpmFieldText = "0";
@@ -115,11 +114,15 @@ public partial class ManualModeViewModel : ObservableObject
         {
             // Cancel any in-flight ramp (e.g. from a preceding track click) so the drag drives directly.
             StopRamp();
+            StopBeatPulse();
             _isDragging = true;
         }
         else
         {
             _isDragging = false;
+            // Drag ended; if we're at-target (no ramp in flight, non-zero), resume pulsing.
+            if (_rampTimer is null && DisplayedBpm > 0)
+                StartBeatPulse();
         }
     }
 
@@ -164,12 +167,12 @@ public partial class ManualModeViewModel : ObservableObject
     public Task InitializeAsync()
     {
         StopRamp();
+        StopBeatPulse();
         _targetBpm = 0;
         _settingFromRamp = true;
         DisplayedBpm = 0;
         _settingFromRamp = false;
         _lastBleSentBpm = -1;
-        IsTargetReached = false;
         ApplyDevice(Device);
         return Task.CompletedTask;
     }
@@ -177,6 +180,7 @@ public partial class ManualModeViewModel : ObservableObject
     public void ForceStop()
     {
         StopRamp();
+        StopBeatPulse();
         _targetBpm = 0;
         _settingFromRamp = true;
         DisplayedBpm = 0;
@@ -220,6 +224,7 @@ public partial class ManualModeViewModel : ObservableObject
     {
         newTarget = Math.Clamp(newTarget, 0, MaxBpm);
         StopRamp();
+        StopBeatPulse();
 
         _rampStart = DisplayedBpm;
         _rampTarget = newTarget;
@@ -227,7 +232,7 @@ public partial class ManualModeViewModel : ObservableObject
 
         if (delta == 0)
         {
-            TriggerPulse();
+            StartBeatPulse();
             return;
         }
 
@@ -270,21 +275,29 @@ public partial class ManualModeViewModel : ObservableObject
         if (atTarget)
         {
             StopRamp();
-            TriggerPulse();
+            StartBeatPulse();
         }
     }
 
-    private void TriggerPulse()
+    private void StartBeatPulse()
     {
-        IsTargetReached = true;
-        _pulseResetTimer?.Stop();
-        _pulseResetTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
-        _pulseResetTimer.Tick += (_, _) =>
-        {
-            IsTargetReached = false;
-            _pulseResetTimer?.Stop();
-        };
-        _pulseResetTimer.Start();
+        StopBeatPulse();
+        if (DisplayedBpm <= 0) return;
+
+        // First beat fires immediately so the user gets feedback the moment
+        // the ramp settles (and also covers the delta==0 already-at-target case).
+        BeatPulse?.Invoke();
+
+        int intervalMs = Math.Max(60_000 / DisplayedBpm, 120);
+        _beatPulseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(intervalMs) };
+        _beatPulseTimer.Tick += (_, _) => BeatPulse?.Invoke();
+        _beatPulseTimer.Start();
+    }
+
+    private void StopBeatPulse()
+    {
+        _beatPulseTimer?.Stop();
+        _beatPulseTimer = null;
     }
 
     private void StopRamp()
