@@ -11,7 +11,7 @@ public partial class ManualModeViewModel : ObservableObject
     private readonly IConnectedDeviceService _connectedDevice;
 
     private DispatcherTimer? _rampTimer;
-    private DispatcherTimer? _debounceTimer;
+    private DispatcherTimer? _bleWriteDebounce;
     private DispatcherTimer? _pulseResetTimer;
 
     private double _rampPosition;
@@ -20,13 +20,22 @@ public partial class ManualModeViewModel : ObservableObject
     private int _rampTarget;
     private int _rampDirection;
 
-    private int _currentSpeedBpm;
+    private int _targetBpm;
+    private bool _settingFromRamp;
+    private bool _isDragging;
+    private bool _bpmFieldFocused;
+    private bool _percentFieldFocused;
 
-    private bool _syncingUnits;
+    private int _lastBleSentBpm = -1;
+    private int _lastBleSentTickMs;
+
+    private const int UiTickMs = 16;
+    private const int BleMinIntervalMs = 50;
+    private const int RampMsPerBpm = 12;  // constant rate: ~83 BPM/sec
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TargetSpeedPercent))]
-    private int _targetSpeedBpm;
+    [NotifyPropertyChangedFor(nameof(DisplayedSpeedPercent))]
+    private int _displayedBpm;
 
     [ObservableProperty]
     private int _maxBpm = 100;
@@ -34,9 +43,15 @@ public partial class ManualModeViewModel : ObservableObject
     [ObservableProperty]
     private bool _isTargetReached;
 
+    [ObservableProperty]
+    private string _bpmFieldText = "0";
+
+    [ObservableProperty]
+    private string _percentFieldText = "0";
+
     public ObservableCollection<PresetItem> Presets { get; } = [];
 
-    public int TargetSpeedPercent => Device?.BpmToPercent(TargetSpeedBpm) ?? 0;
+    public int DisplayedSpeedPercent => Device?.BpmToPercent(DisplayedBpm) ?? 0;
 
     private IDevice? Device => _connectedDevice.CurrentDevice;
 
@@ -61,88 +76,144 @@ public partial class ManualModeViewModel : ObservableObject
             MaxBpm = 100;
         }
         UpdatePresetActiveStates();
-        OnPropertyChanged(nameof(TargetSpeedPercent));
+        OnPropertyChanged(nameof(DisplayedSpeedPercent));
+        RefreshFieldText();
     }
 
-    partial void OnTargetSpeedBpmChanged(int value)
+    partial void OnDisplayedBpmChanged(int oldValue, int newValue)
     {
-        if (_syncingUnits) return;
-        UpdatePresetActiveStates();
-        RestartDebounce();
+        if (!_bpmFieldFocused)
+            BpmFieldText = newValue.ToString();
+        if (!_percentFieldFocused)
+            PercentFieldText = DisplayedSpeedPercent.ToString();
+
+        if (_settingFromRamp) return;
+
+        if (_isDragging)
+        {
+            // Thumb drag — direct drive, no ramp.
+            StopRamp();
+            _targetBpm = newValue;
+            UpdatePresetActiveStates();
+            RestartBleDebounce();
+        }
+        else
+        {
+            // Slider track click (IsMoveToPointEnabled jump) — revert and ramp from old to new.
+            _settingFromRamp = true;
+            DisplayedBpm = oldValue;
+            _settingFromRamp = false;
+            _targetBpm = newValue;
+            UpdatePresetActiveStates();
+            BeginRamp(_targetBpm);
+        }
     }
 
-    // Allow the % textbox to write back to BPM via the device's mapping.
+    public void NotifyDragging(bool dragging)
+    {
+        if (dragging)
+        {
+            // Cancel any in-flight ramp (e.g. from a preceding track click) so the drag drives directly.
+            StopRamp();
+            _isDragging = true;
+        }
+        else
+        {
+            _isDragging = false;
+        }
+    }
+
     public void SetTargetFromPercent(int percent)
     {
         if (Device is null) return;
-        _syncingUnits = true;
-        TargetSpeedBpm = Device.PercentToBpm(percent);
-        _syncingUnits = false;
+        _targetBpm = Math.Clamp(Device.PercentToBpm(percent), 0, MaxBpm);
         UpdatePresetActiveStates();
-        RestartDebounce();
+        BeginRamp(_targetBpm);
+    }
+
+    public void SetTargetBpm(int bpm)
+    {
+        _targetBpm = Math.Clamp(bpm, 0, MaxBpm);
+        UpdatePresetActiveStates();
+        BeginRamp(_targetBpm);
     }
 
     [RelayCommand]
     private void SetPreset(PresetItem preset)
     {
         if (preset is null) return;
-        _syncingUnits = true;
-        TargetSpeedBpm = preset.Bpm;
-        _syncingUnits = false;
+        _targetBpm = preset.Bpm;
         UpdatePresetActiveStates();
-        _debounceTimer?.Stop();
-        BeginRamp(preset.Bpm);
+        BeginRamp(_targetBpm);
+    }
+
+    public void NotifyBpmFieldFocus(bool focused)
+    {
+        _bpmFieldFocused = focused;
+        if (!focused)
+            BpmFieldText = DisplayedBpm.ToString();
+    }
+
+    public void NotifyPercentFieldFocus(bool focused)
+    {
+        _percentFieldFocused = focused;
+        if (!focused)
+            PercentFieldText = DisplayedSpeedPercent.ToString();
     }
 
     public Task InitializeAsync()
     {
         StopRamp();
-        _syncingUnits = true;
-        TargetSpeedBpm = 0;
-        _currentSpeedBpm = 0;
-        _syncingUnits = false;
+        _targetBpm = 0;
+        _settingFromRamp = true;
+        DisplayedBpm = 0;
+        _settingFromRamp = false;
+        _lastBleSentBpm = -1;
         IsTargetReached = false;
         ApplyDevice(Device);
         return Task.CompletedTask;
     }
 
-    // Called from code-behind on slider DragCompleted — bypasses debounce.
-    public void CommitSliderValue()
-    {
-        _debounceTimer?.Stop();
-        BeginRamp(TargetSpeedBpm);
-    }
-
-    // Called by MainViewModel emergency stop.
     public void ForceStop()
     {
         StopRamp();
-        _syncingUnits = true;
-        TargetSpeedBpm = 0;
-        _currentSpeedBpm = 0;
-        _syncingUnits = false;
+        _targetBpm = 0;
+        _settingFromRamp = true;
+        DisplayedBpm = 0;
+        _settingFromRamp = false;
+        _lastBleSentBpm = 0;
+        _lastBleSentTickMs = Environment.TickCount;
         UpdatePresetActiveStates();
+    }
+
+    private void RefreshFieldText()
+    {
+        if (!_bpmFieldFocused)
+            BpmFieldText = DisplayedBpm.ToString();
+        if (!_percentFieldFocused)
+            PercentFieldText = DisplayedSpeedPercent.ToString();
     }
 
     private void UpdatePresetActiveStates()
     {
         foreach (var preset in Presets)
-            preset.IsActive = preset.Bpm == TargetSpeedBpm;
+            preset.IsActive = preset.Bpm == _targetBpm;
     }
 
-    private void RestartDebounce()
+    private void RestartBleDebounce()
     {
-        if (_debounceTimer == null)
+        if (_bleWriteDebounce == null)
         {
-            _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
-            _debounceTimer.Tick += (_, _) =>
+            _bleWriteDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
+            _bleWriteDebounce.Tick += (_, _) =>
             {
-                _debounceTimer.Stop();
-                BeginRamp(TargetSpeedBpm);
+                _bleWriteDebounce.Stop();
+                if (Device is { } device)
+                    _ = device.SetTargetBpmAsync(DisplayedBpm);
             };
         }
-        _debounceTimer.Stop();
-        _debounceTimer.Start();
+        _bleWriteDebounce.Stop();
+        _bleWriteDebounce.Start();
     }
 
     private void BeginRamp(int newTarget)
@@ -150,7 +221,7 @@ public partial class ManualModeViewModel : ObservableObject
         newTarget = Math.Clamp(newTarget, 0, MaxBpm);
         StopRamp();
 
-        _rampStart = _currentSpeedBpm;
+        _rampStart = DisplayedBpm;
         _rampTarget = newTarget;
         int delta = Math.Abs(newTarget - _rampStart);
 
@@ -163,12 +234,12 @@ public partial class ManualModeViewModel : ObservableObject
         _rampDirection = Math.Sign(newTarget - _rampStart);
         _rampPosition = 0;
 
-        // Scale ramp duration relative to MaxBpm so it feels the same across devices.
-        int durationMs = Math.Clamp(delta * 1200 / Math.Max(MaxBpm, 1), 500, 1500);
-        int ticksNeeded = Math.Max(durationMs / 50, 1);
+        // Constant rate: duration is proportional to delta.
+        int durationMs = delta * RampMsPerBpm;
+        int ticksNeeded = Math.Max(durationMs / UiTickMs, 1);
         _rampStep = (double)delta / ticksNeeded;
 
-        _rampTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _rampTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(UiTickMs) };
         _rampTimer.Tick += OnRampTick;
         _rampTimer.Start();
     }
@@ -181,11 +252,22 @@ public partial class ManualModeViewModel : ObservableObject
             Math.Min(_rampStart, _rampTarget),
             Math.Max(_rampStart, _rampTarget));
 
-        _currentSpeedBpm = newSpeed;
-        if (Device is { } device)
-            _ = device.SetTargetBpmAsync(newSpeed);
+        _settingFromRamp = true;
+        DisplayedBpm = newSpeed;
+        _settingFromRamp = false;
 
-        if (newSpeed == _rampTarget)
+        bool atTarget = newSpeed == _rampTarget;
+        int nowMs = Environment.TickCount;
+        bool dueByTime = nowMs - _lastBleSentTickMs >= BleMinIntervalMs;
+        if (newSpeed != _lastBleSentBpm && (atTarget || dueByTime))
+        {
+            _lastBleSentBpm = newSpeed;
+            _lastBleSentTickMs = nowMs;
+            if (Device is { } device)
+                _ = device.SetTargetBpmAsync(newSpeed);
+        }
+
+        if (atTarget)
         {
             StopRamp();
             TriggerPulse();
