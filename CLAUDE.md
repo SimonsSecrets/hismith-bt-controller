@@ -76,6 +76,38 @@ See `HismithProtocol.cs` for the implementation.
 - **Audio thread** — NAudio fires `DataAvailable` here; beat detection runs synchronously in this callback
 - **BLE writes** — `async`/`await` dispatched from the UI thread; serialized by `SemaphoreSlim` in `HismithBleDeviceService`
 
+## Code Documentation
+
+Document the **why**, not the what. Well-named identifiers already communicate what the code does; comments should explain what a future reader would not guess from the names alone. Write a comment when the code encodes a hidden constraint, a non-obvious invariant, a deliberate trade-off, or a derivation that would take meaningful effort to reconstruct.
+
+Concrete cases that always warrant a comment:
+
+- **Non-obvious constants** — show the derivation or formula inline so the reader does not have to reverse-engineer it.
+  ```csharp
+  kickEnvelope *= 0.99971; // 0.99971^8820 ≈ e^(-2.56) ≈ 0.077 → ~7.7 % after 200 ms
+  ```
+- **Threading invariants** — note which thread a method or callback runs on when it is not apparent from the call site, and explain any cross-thread state access.
+  ```csharp
+  // volatile: written by audio thread, read by UI thread via State property.
+  private volatile AudioCaptureState _state;
+  ```
+- **Algorithm trade-off** — one concise sentence explaining why this algorithm was chosen over an obvious alternative.
+  ```csharp
+  // Linear interpolation: adequate for beat detection and spectrum display;
+  // a polyphase filter is not worth the extra CPU cost on the audio thread.
+  ```
+- **Subtle invariants** — anything that silently breaks if violated, including order-of-operations requirements, sign-extension logic, or the reason a guard condition exists.
+  ```csharp
+  // Unsubscribe before StopRecording so NAudio cannot fire callbacks
+  // against the capture object while it is mid-disposal.
+  ```
+- **Magic number divisors** — explain the value and what it maps to.
+  ```csharp
+  16 => BitConverter.ToInt16(buffer, offset) / 32768f,  // 2^15: maps [-32768, 32767] → [-1, ~1)
+  ```
+
+Keep comments tight — one precise sentence is almost always enough. Never restate what the code already says clearly. Do not add a comment to every method or block; only add one where the WHY is genuinely non-obvious.
+
 ## WPF UI Guidelines
 
 ### Drop shadows — always use the two-layer approach

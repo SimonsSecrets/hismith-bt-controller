@@ -68,9 +68,16 @@ public partial class App : Application
         var settings = new AppSettings();
         configuration.Bind(settings);
 
-        bool useMock = settings.UseMockBle
-            || e.Args.Contains("--mock", StringComparer.OrdinalIgnoreCase);
-        settings.UseMockBle = useMock;
+        // --mock implies both axes; --mock-ble / --mock-audio control each axis independently.
+        bool mockBle = settings.UseMockBle
+            || e.Args.Contains("--mock", StringComparer.OrdinalIgnoreCase)
+            || e.Args.Contains("--mock-ble", StringComparer.OrdinalIgnoreCase);
+        bool mockAudio = settings.UseMockAudio
+            || e.Args.Contains("--mock", StringComparer.OrdinalIgnoreCase)
+            || e.Args.Contains("--mock-audio", StringComparer.OrdinalIgnoreCase);
+
+        settings.UseMockBle = mockBle;
+        settings.UseMockAudio = mockAudio;
 
         var services = new ServiceCollection();
         services.AddLogging(builder =>
@@ -80,7 +87,7 @@ public partial class App : Application
         });
         services.AddSingleton(settings);
 
-        if (useMock)
+        if (mockBle)
         {
             services.AddSingleton<IBleDeviceService, MockBleDeviceService>();
             services.AddSingleton<IDeviceDiscoveryService, MockDeviceDiscoveryService>();
@@ -90,7 +97,11 @@ public partial class App : Application
             services.AddSingleton<IBleDeviceService, HismithBleDeviceService>();
             services.AddSingleton<IDeviceDiscoveryService, BleDeviceDiscoveryService>();
         }
-        services.AddSingleton<IAudioCaptureService, WasapiLoopbackAudioCaptureService>();
+
+        if (mockAudio)
+            services.AddSingleton<IAudioCaptureService, MockAudioCaptureService>();
+        else
+            services.AddSingleton<IAudioCaptureService, WasapiLoopbackAudioCaptureService>();
         services.AddSingleton<IConnectedDeviceService, ConnectedDeviceService>();
         services.AddSingleton<ConnectionViewModel>();
         services.AddSingleton<ManualModeViewModel>();

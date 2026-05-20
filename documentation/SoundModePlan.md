@@ -19,7 +19,7 @@ Design source of truth: [design/modes.jsx](design/modes.jsx) (SoundMode componen
   - `AudioCaptureState` enum (`Stopped`, `Starting`, `Running`, `NoSignal`, `Error`).
 - Register `IAudioCaptureService` in the DI container in `App.xaml.cs`.
 
-### 1.2 Implement `WasapiLoopbackAudioCaptureService`
+### 1.2 Implement `WasapiLoopbackAudioCaptureService` ✅
 - Wrap `NAudio.CoreAudioApi.WasapiLoopbackCapture`.
 - **Handle any system audio format**, not just float32 at 44.1/48 kHz. `WasapiLoopbackCapture.WaveFormat` is whatever the system mixer is configured for and can be 16-bit PCM, 24-bit PCM, 32-bit int, or float, at any sample rate (44.1, 48, 96, 192 kHz…), with any channel count (mono, stereo, 5.1, 7.1).
   - On `DataAvailable`, branch on `WaveFormat.Encoding` + `BitsPerSample` to decode each frame into a `float[]` in the range `[-1, 1]`. Cover `IeeeFloat` (32-bit), `Pcm` (16/24/32-bit), and `Extensible` (inspect `SubFormat` GUID — both PCM and float subformats exist in the wild). Throw a clear `NotSupportedException` for anything else so we discover it instead of silently writing zeros.
@@ -29,7 +29,7 @@ Design source of truth: [design/modes.jsx](design/modes.jsx) (SoundMode componen
 - Implement a simple silence detector: if RMS over the last ~500ms is below a small threshold, set state to `NoSignal` so the UI can show the "Play some music to get started" idle state.
 - All NAudio callbacks fire on a worker thread — the service must marshal `SamplesAvailable` to subscribers without blocking the capture thread. Keep the callback under ~2ms of work (decode + downmix + resample combined).
 
-### 1.2a Mock variants — two independent axes
+### 1.2a Mock variants — two independent axes ✅
 Mocking BLE and mocking audio are independent concerns and should be controllable separately. Extend `AppSettings.cs` accordingly:
 - `UseMockBle` (existing) — already gates `MockBleDeviceService` vs `HismithBleDeviceService`.
 - Add `UseMockAudio` (new bool, default false). Add a matching `--mock-audio` command-line flag. The existing `--mock` flag should now imply **both** `UseMockBle=true` and `UseMockAudio=true` (so existing behaviour is preserved); add `--mock-ble` as an explicit single-axis alternative.
