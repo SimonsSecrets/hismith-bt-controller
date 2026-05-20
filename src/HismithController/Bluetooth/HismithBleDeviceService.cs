@@ -85,12 +85,17 @@ public sealed class HismithBleDeviceService : IBleDeviceService
                 $"Failed to read model characteristic (status: {readResult.Status}).");
 
         var reader = DataReader.FromBuffer(readResult.Value);
-        reader.ByteOrder = ByteOrder.LittleEndian;
-        if (reader.UnconsumedBufferLength < sizeof(ushort))
-            throw new InvalidOperationException(
-                $"Model characteristic returned {reader.UnconsumedBufferLength} bytes (expected ≥ 2).");
+        var rawBytes = new byte[reader.UnconsumedBufferLength];
+        reader.ReadBytes(rawBytes);
+        var rawHex = Convert.ToHexString(rawBytes);
+        _logger.LogInformation("Model characteristic raw bytes: {Hex} ({Length} bytes)",
+            rawHex, rawBytes.Length);
 
-        var code = reader.ReadUInt16();
+        if (rawBytes.Length < sizeof(ushort))
+            throw new InvalidOperationException(
+                $"Model characteristic returned {rawBytes.Length} bytes (expected ≥ 2). Raw: {rawHex}");
+
+        var code = (ushort)((rawBytes[0] << 8) | rawBytes[1]);
         _logger.LogInformation("Device product code: 0x{Code:X4}", code);
         return code;
     }

@@ -66,6 +66,8 @@ Command frame: `[0xAA, command_byte, value_byte, checksum]` where checksum = com
 - Stop: `AA 04 00 04`
 - Set mode: `AA 05 mode(01-09) checksum`
 
+**Model characteristic byte order**: the model code is returned **big-endian** over BLE. The AK Series device (product code 0x1001) sends bytes `10 01` on the Info/Model characteristic — parse as `(bytes[0] << 8) | bytes[1]`, NOT as little-endian. Verified empirically on 2026-05-20 against a real AK-01.
+
 See `HismithProtocol.cs` for the implementation.
 
 ## Threading Model

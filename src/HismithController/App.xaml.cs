@@ -2,6 +2,7 @@ using System.Windows;
 using HismithController.Bluetooth;
 using HismithController.Configuration;
 using HismithController.Devices;
+using HismithController.Logging;
 using HismithController.Services;
 using HismithController.ViewModels;
 using Microsoft.Extensions.Configuration;
@@ -42,8 +43,18 @@ public partial class App : Application
 
     private static void WriteCrashLog(string source, Exception ex)
     {
-        var path = System.IO.Path.Combine(AppContext.BaseDirectory, "crash.log");
-        System.IO.File.WriteAllText(path, $"[{source}]\n{ex}");
+        try
+        {
+            var dir = FileLoggerProvider.DefaultLogDirectory;
+            System.IO.Directory.CreateDirectory(dir);
+            var path = System.IO.Path.Combine(dir, "crash.txt");
+            System.IO.File.WriteAllText(path,
+                $"[{DateTimeOffset.Now:yyyy-MM-ddTHH:mm:ss.fffzzz}] [{source}]{Environment.NewLine}{ex}");
+        }
+        catch
+        {
+            // Crash logging must never throw.
+        }
     }
 
     private void StartupCore(StartupEventArgs e)
@@ -61,7 +72,11 @@ public partial class App : Application
         settings.UseMockBle = useMock;
 
         var services = new ServiceCollection();
-        services.AddLogging(builder => builder.AddDebug());
+        services.AddLogging(builder =>
+        {
+            builder.AddDebug();
+            builder.AddProvider(new FileLoggerProvider(FileLoggerProvider.DefaultLogDirectory));
+        });
         services.AddSingleton(settings);
 
         if (useMock)

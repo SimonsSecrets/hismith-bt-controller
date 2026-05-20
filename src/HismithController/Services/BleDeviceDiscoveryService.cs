@@ -75,15 +75,15 @@ public sealed class BleDeviceDiscoveryService : IDeviceDiscoveryService
     private void OnAdvertisementReceived(BluetoothLEAdvertisementWatcher sender,
         BluetoothLEAdvertisementReceivedEventArgs args)
     {
+        var name = args.Advertisement.LocalName;
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
         lock (_seenLock)
         {
             if (!_seenAddresses.Add(args.BluetoothAddress))
                 return;
         }
-
-        var name = args.Advertisement.LocalName;
-        if (string.IsNullOrWhiteSpace(name))
-            return;
 
         var address = FormatAddress(args.BluetoothAddress);
         var signal = RssiToSignalStrength(args.RawSignalStrengthInDBm);
