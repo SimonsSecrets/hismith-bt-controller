@@ -1,5 +1,6 @@
 using System.Windows;
 using HismithController.Audio;
+using HismithController.BeatDetection;
 using HismithController.Bluetooth;
 using HismithController.Configuration;
 using HismithController.Devices;
@@ -103,6 +104,7 @@ public partial class App : Application
         else
             services.AddSingleton<IAudioCaptureService, WasapiLoopbackAudioCaptureService>();
         services.AddSingleton<SpectrumAnalyzer>();
+        services.AddSingleton<IBeatDetector, SpectralFluxBeatDetector>();
         services.AddSingleton<IConnectedDeviceService, ConnectedDeviceService>();
         services.AddSingleton<ConnectionViewModel>();
         services.AddSingleton<ManualModeViewModel>();

@@ -85,12 +85,12 @@ Implement `MockAudioCaptureService` to generate a 120 BPM kick-style pulse + pin
 
 **Goal:** Detect beats from the captured audio and surface them in the UI (beat-ring flash + a live BPM number). Still no device commands.
 
-### 2.1 Scaffold the beat detection feature folder
+### 2.1 Scaffold the beat detection feature folder ✅
 - Create `src/HismithController/Features/BeatDetection/`:
   - `IBeatDetector` — consumes mono float frames, raises `BeatDetected` (timestamp + confidence) and exposes a `CurrentBpm` smoothed estimate.
   - `BeatEventArgs` — carries beat timestamp and confidence.
 
-### 2.2 Implement `SpectralFluxBeatDetector`
+### 2.2 Implement `SpectralFluxBeatDetector` ✅
 - Use the parameters already documented in [CLAUDE.md](CLAUDE.md) §"Beat Detection":
   - FFT size 512, hop 256 (~5.8 ms hop at 44.1 kHz).
   - Positive spectral flux summed over **low-frequency bins** (kick/bass range, roughly 0–250 Hz).

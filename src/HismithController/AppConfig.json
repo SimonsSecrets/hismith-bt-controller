@@ -1,3 +1,4 @@
 {
-  "UseMockBle": false
+  "UseMockBle": false,
+  "OnsetMultiplier": 1.5
 }
