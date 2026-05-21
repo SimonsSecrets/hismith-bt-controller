@@ -59,7 +59,7 @@
                                  Background="Transparent" BorderThickness="0"
                                  TextAlignment="Center" CaretBrush="{DynamicResource RoseBrush}"
                                  SelectionBrush="{DynamicResource RoseSoftBrush}"
-                                 Padding="0" KeyDown="OnPercentFieldKeyDown"
+                                 Padding="0" PreviewKeyDown="OnPercentFieldPreviewKeyDown"
                                  GotKeyboardFocus="OnPercentFieldGotFocus"
                                  LostKeyboardFocus="OnPercentFieldLostFocus"
                                  PreviewMouseLeftButtonDown="OnNumFieldPreviewMouseLeftButtonDown" />
@@ -105,7 +105,7 @@
                                  Background="Transparent" BorderThickness="0"
                                  TextAlignment="Center" CaretBrush="{DynamicResource RoseBrush}"
                                  SelectionBrush="{DynamicResource RoseSoftBrush}"
-                                 Padding="0" KeyDown="OnBpmFieldKeyDown"
+                                 Padding="0" PreviewKeyDown="OnBpmFieldPreviewKeyDown"
                                  GotKeyboardFocus="OnBpmFieldGotFocus"
                                  LostKeyboardFocus="OnBpmFieldLostFocus"
                                  PreviewMouseLeftButtonDown="OnNumFieldPreviewMouseLeftButtonDown" />
@@ -119,7 +119,8 @@
         </Grid>
 
         <!-- ========== SLIDER ========== -->
-        <Slider Minimum="0" Maximum="{Binding MaxBpm}"
+        <Slider x:Name="SpeedSlider"
+                Minimum="0" Maximum="{Binding MaxBpm}"
                 Value="{Binding DisplayedBpm, Mode=TwoWay}"
                 Style="{StaticResource ManualSpeedSlider}"
                 IsMoveToPointEnabled="True"

@@ -89,12 +89,21 @@ public partial class ManualModeView : UserControl
         vm.NotifyPercentFieldFocus(false);
     }
 
-    private void OnPercentFieldKeyDown(object sender, KeyEventArgs e)
+    private void OnPercentFieldPreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
         {
-            Keyboard.ClearFocus();
+            // Move focus to the Window rather than clearing it entirely; Keyboard.ClearFocus()
+            // severs WPF's key-event routing, which silences the spacebar emergency stop.
+            SpeedSlider.Focus();
             e.Handled = true;
+        }
+        else if (e.Key == Key.Space)
+        {
+            // Window.PreviewKeyDown handles space when no text field is focused; mirror it here
+            // so the emergency stop also fires while this field holds keyboard focus.
+            e.Handled = true;
+            TriggerEmergencyStop();
         }
     }
 
@@ -115,13 +124,25 @@ public partial class ManualModeView : UserControl
         vm.NotifyBpmFieldFocus(false);
     }
 
-    private void OnBpmFieldKeyDown(object sender, KeyEventArgs e)
+    private void OnBpmFieldPreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
         {
-            Keyboard.ClearFocus();
+            SpeedSlider.Focus();
             e.Handled = true;
         }
+        else if (e.Key == Key.Space)
+        {
+            e.Handled = true;
+            TriggerEmergencyStop();
+        }
+    }
+
+    private void TriggerEmergencyStop()
+    {
+        if (Window.GetWindow(this)?.DataContext is not MainViewModel vm) return;
+        if (vm.EmergencyStopCommand.CanExecute(null))
+            vm.EmergencyStopCommand.Execute(null);
     }
 
     private void OnNumFieldPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
