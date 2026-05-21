@@ -119,14 +119,14 @@ Approach: **beat-count window, not time window, plus explicit change detection.*
 
 **Tuning levers** (all live in `AppSettings`, not hardcoded): `K` (window size), deviation threshold for change detection (default 0.25), confirmation tolerance (default 0.15), EMA α (default 0.5).
 
-### 2.4 Extend `SoundModeViewModel`
+### 2.4 Extend `SoundModeViewModel` ✅
 - Subscribe to `BeatDetected` and `CurrentBpm` changes.
 - New properties:
   - `LiveBpm` (int) — the music BPM displayed in the "Music" stat.
   - `BeatTick` (bool) — flips briefly true on each beat so the UI can flash. Use a `DispatcherTimer` of ~120 ms to reset it.
 - The `IsPlaying = false` (paused) state gates the `BeatTick` flashes but **does not stop** the capture or detector — the visualizer keeps moving (per design §6.6).
 
-### 2.5 Extend `SoundModeView.xaml`
+### 2.5 Extend `SoundModeView.xaml` ✅
 - Add the **beat ring overlay** (`viz-beat-ring` in the design): a centered ring that scales/opacity-pulses when `BeatTick` flips. Use a `Storyboard` triggered by a `DataTrigger` on `BeatTick`, or a behavior that animates on each event.
 - Add the **Live stats bar** stub with just the "Music" stat populated (Device/Speed columns can show `—` for now).
 - Add the Play/Pause button bound to `IsPlaying` (no device wiring yet — just the bool and the visual "Detection paused" badge).
