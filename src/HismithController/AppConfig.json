@@ -1,4 +1,8 @@
 {
   "UseMockBle": false,
-  "OnsetMultiplier": 1.5
+  "OnsetMultiplier": 1.5,
+  "BpmWindowK": 4,
+  "BpmDeviationThreshold": 0.25,
+  "BpmConfirmationTolerance": 0.15,
+  "BpmEmaAlpha": 0.5
 }

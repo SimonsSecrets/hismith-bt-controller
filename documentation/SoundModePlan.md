@@ -99,7 +99,7 @@ Implement `MockAudioCaptureService` to generate a 120 BPM kick-style pulse + pin
 - The detector runs synchronously inside the audio service's `SamplesAvailable` handler — it must stay under **5 ms per frame** (this is non-negotiable; the NAudio capture thread will glitch otherwise). Measure with `Stopwatch` in debug builds.
 - Use `MathNet.Numerics`' `Fourier.ForwardReal()` for the FFT.
 
-### 2.3 BPM estimation
+### 2.3 BPM estimation ✅
 The estimator has to satisfy two competing requirements:
 - **Wide range:** support 15–240 BPM. At 15 BPM, beats are 4 seconds apart — any time-based history window large enough to be statistically meaningful at 15 BPM would be far too laggy at higher tempos.
 - **Fast response to changes:** a metronome that switches tempo every 5 seconds must be tracked. An 8-second median window cannot do this — by construction it averages across the change.

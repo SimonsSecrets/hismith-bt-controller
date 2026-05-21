@@ -4,7 +4,8 @@ using HismithController.Configuration;
 
 namespace HismithController.BeatDetection;
 
-// Detects beats via positive spectral flux in the kick/bass frequency band.
+// Detects beats via positive spectral flux in the kick/bass frequency band and
+// feeds the resulting inter-beat intervals to a BpmEstimator.
 //
 // Algorithm: for every hop of HopSize new samples, a 512-point FFT is computed
 // over the most recent FftSize samples (50 % overlap). Spectral flux is the sum
@@ -38,23 +39,26 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     // double-triggers on the same transient across adjacent hops.
     private const double MinInterOnsetMs = 200.0;
 
-    // K=4 IBI ring buffer for a basic median-based BPM estimate (Phase 2).
-    // The full BpmEstimator with change-detection is wired in Phase 2 task 2.3.
-    private const int IbiBufferLen = 4;
+    // IBIs above this value indicate a long gap (e.g. audio service restarted)
+    // rather than a genuine slow tempo. 60000/15 ≈ 4000 ms corresponds to 15 BPM,
+    // the stated minimum; anything larger resets the estimator instead of being
+    // fed in as a "very slow" IBI that would skew the BPM estimate for many beats.
+    private const double MaxIbiMs = 60_000.0 / 15.0; // ≈ 4000 ms
 
-    private readonly float _onsetMultiplier;
+    private readonly float        _onsetMultiplier;
+    private readonly BpmEstimator _bpmEstimator;
 
     // ── Ring buffer ───────────────────────────────────────────────────────────
     // _ringWritePos points to the oldest sample (= next slot to overwrite).
     // After each write, _ringWritePos = (pos + 1) % FftSize, so the extraction
     // loop (idx = (_ringWritePos + i) % FftSize, i = 0..FftSize-1) always yields
     // samples in oldest-to-newest order — the correct input order for the FFT.
-    private readonly float[] _ring         = new float[FftSize];
-    private readonly Complex[] _fftBuffer  = new Complex[FftSize];
-    private readonly float[] _hannWindow;
-    private int  _ringWritePos;
-    private int  _samplesReceived;
-    private int  _hopAccumulator;
+    private readonly float[]   _ring      = new float[FftSize];
+    private readonly Complex[] _fftBuffer = new Complex[FftSize];
+    private readonly float[]   _hannWindow;
+    private int _ringWritePos;
+    private int _samplesReceived;
+    private int _hopAccumulator;
 
     // Previous-hop low-band magnitudes for spectral flux computation.
     // Sized LowBinHigh; index 0 (DC) is unused.
@@ -62,25 +66,17 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     private bool _hasPrevMag;
 
     // Adaptive threshold history ring buffer.
-    private readonly double[] _fluxHistory  = new double[FluxHistoryLen];
-    private int  _fluxHistoryPos;
-    private int  _fluxHistoryCount;
+    private readonly double[] _fluxHistory = new double[FluxHistoryLen];
+    private int _fluxHistoryPos;
+    private int _fluxHistoryCount;
 
-    // Inter-onset timing: last beat TickCount64 (ms) and timestamp.
-    // _lastBeatTick == 0 until the first beat is detected.
+    // Last beat TickCount64 (ms). 0 until the first beat is detected.
     private long _lastBeatTick;
 
-    // IBI ring buffer (milliseconds) for median BPM estimation.
-    private readonly double[] _ibis = new double[IbiBufferLen];
-    private int _ibiPos;
-    private int _ibiCount;
-
-    // volatile: written by the audio thread, read by UI / ViewModel threads.
-    private volatile int   _currentBpm;
-    private volatile float _confidence;
-
-    public int   CurrentBpm => _currentBpm;
-    public float Confidence => _confidence;
+    public int   CurrentBpm => _bpmEstimator.CurrentBpm;
+    // BPM estimation confidence — distinct from per-onset detection strength,
+    // which is carried separately in BeatEventArgs.Confidence.
+    public float Confidence => _bpmEstimator.Confidence;
 
     public event EventHandler<BeatEventArgs>? BeatDetected;
 
@@ -88,6 +84,11 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     {
         _onsetMultiplier = (float)settings.OnsetMultiplier;
         _hannWindow      = BuildHannWindow(FftSize);
+        _bpmEstimator    = new BpmEstimator(
+            k:                   settings.BpmWindowK,
+            deviationThreshold:  settings.BpmDeviationThreshold,
+            confirmTolerance:    settings.BpmConfirmationTolerance,
+            emaAlpha:            settings.BpmEmaAlpha);
 
         // Lifetime matches the app; unsubscribing is not needed.
         audioService.SamplesAvailable += OnSamplesAvailable;
@@ -180,25 +181,26 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
         if (threshold <= 0.0 || flux <= threshold) return;
 
         // Min inter-onset interval guard.
-        long now       = Environment.TickCount64;
+        long   now     = Environment.TickCount64;
         double elapsed = _lastBeatTick == 0 ? double.MaxValue : now - _lastBeatTick;
         if (elapsed < MinInterOnsetMs) return;
 
-        // Record IBI for BPM estimation.
+        // Feed the inter-beat interval to the BPM estimator.
         if (_lastBeatTick != 0)
         {
-            _ibis[_ibiPos] = elapsed;
-            _ibiPos = (_ibiPos + 1) % IbiBufferLen;
-            if (_ibiCount < IbiBufferLen) _ibiCount++;
-            _currentBpm = ComputeMedianBpm();
+            if (elapsed < MaxIbiMs)
+                _bpmEstimator.AddIbi(elapsed);
+            else
+                // Long gap (e.g. audio paused / restarted): stale history would
+                // skew the estimate for many beats; better to restart fresh.
+                _bpmEstimator.Reset();
         }
 
         _lastBeatTick = now;
 
-        // Confidence: how far above threshold the onset landed.
-        // 0 = just at threshold, 1 = twice the threshold.
+        // Onset confidence: how far above the adaptive threshold this peak was.
+        // 0 = just at threshold, 1 = 2× threshold.
         float conf = (float)Math.Min(1.0, (flux / threshold - 1.0) * 2.0);
-        _confidence = conf;
 
         BeatDetected?.Invoke(this, new BeatEventArgs(DateTimeOffset.UtcNow, conf));
     }
@@ -212,36 +214,6 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
             double im = _fftBuffer[k].Y;
             _prevMag[k] = (float)(Math.Sqrt(re * re + im * im) / (FftSize / 2.0));
         }
-    }
-
-    // Median of the K most recent IBIs, converted to BPM.
-    // Median is robust to a single mis-detected beat; at K=4 it tolerates one
-    // outlier without the percentile-trim instability that arises at small N.
-    private int ComputeMedianBpm()
-    {
-        if (_ibiCount < 2) return 0;
-
-        // Insertion sort on a stack-allocated copy (K=4, negligible overhead).
-        Span<double> temp = stackalloc double[IbiBufferLen];
-        int n = 0;
-        for (int i = 0; i < _ibiCount; i++)
-            temp[n++] = _ibis[i];
-
-        for (int i = 1; i < n; i++)
-        {
-            double key = temp[i];
-            int    j   = i - 1;
-            while (j >= 0 && temp[j] > key) { temp[j + 1] = temp[j]; j--; }
-            temp[j + 1] = key;
-        }
-
-        double medianMs = n % 2 == 0
-            ? (temp[n / 2 - 1] + temp[n / 2]) / 2.0
-            : temp[n / 2];
-
-        // Clamp to the supported BPM range (15–240) rather than returning
-        // impossible values on spurious double-triggers or very slow sources.
-        return Math.Clamp((int)Math.Round(60000.0 / medianMs), 15, 240);
     }
 
     private static float[] BuildHannWindow(int size)
