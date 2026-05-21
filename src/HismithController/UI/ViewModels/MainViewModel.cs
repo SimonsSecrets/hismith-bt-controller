@@ -21,6 +21,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IBleDeviceService _bleService;
     private readonly IConnectedDeviceService _connectedDevice;
     private readonly ConnectionViewModel _connectionViewModel;
+    private readonly SoundModeViewModel _soundModeViewModel;
     private DispatcherTimer? _stopFlashTimer;
 
     [ObservableProperty]
@@ -57,12 +58,14 @@ public partial class MainViewModel : ObservableObject
         IBleDeviceService bleService,
         IConnectedDeviceService connectedDevice,
         ConnectionViewModel connectionViewModel,
-        ManualModeViewModel manualModeViewModel)
+        ManualModeViewModel manualModeViewModel,
+        SoundModeViewModel soundModeViewModel)
     {
         _bleService = bleService;
         _connectedDevice = connectedDevice;
         _connectionViewModel = connectionViewModel;
         ManualModeViewModel = manualModeViewModel;
+        _soundModeViewModel = soundModeViewModel;
         _currentView = connectionViewModel;
 
         _connectionViewModel.Connected += OnDeviceConnected;
@@ -137,11 +140,29 @@ public partial class MainViewModel : ObservableObject
         ActiveMode = mode;
     }
 
+    // Called before ActiveMode changes; stops the outgoing mode's capture/ramp.
+    partial void OnActiveModeChanging(string value)
+    {
+        if (ActiveMode == "Sound")
+            _ = _soundModeViewModel.DeactivateAsync();
+    }
+
     partial void OnActiveModeChanged(string value)
     {
-        ActiveModeContent = value == "Manual" ? (object)ManualModeViewModel : null;
         if (value == "Manual")
+        {
+            ActiveModeContent = ManualModeViewModel;
             _ = ManualModeViewModel.InitializeAsync();
+        }
+        else if (value == "Sound")
+        {
+            ActiveModeContent = _soundModeViewModel;
+            _ = _soundModeViewModel.InitializeAsync();
+        }
+        else
+        {
+            ActiveModeContent = null;
+        }
     }
 
     private void OnDeviceConnected(object? sender, string deviceName)

@@ -106,6 +106,7 @@ public partial class App : Application
         services.AddSingleton<IConnectedDeviceService, ConnectedDeviceService>();
         services.AddSingleton<ConnectionViewModel>();
         services.AddSingleton<ManualModeViewModel>();
+        services.AddSingleton<SoundModeViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 

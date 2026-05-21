@@ -49,7 +49,7 @@ Implement `MockAudioCaptureService` to generate a 120 BPM kick-style pulse + pin
   - Apply a smoothing/decay (`bin = max(newValue, bin * 0.85)`) so bars don't jitter visually.
 - Expose a `SpectrumUpdated` event delivering the 56-bin array at ~30 fps (downsample from the FFT rate).
 
-### 1.4 `SoundModeViewModel` (minimal)
+### 1.4 `SoundModeViewModel` (minimal) ✅
 - Create `src/HismithController/UI/ViewModels/SoundModeViewModel.cs` modeled after [ManualModeViewModel.cs](src/HismithController/UI/ViewModels/ManualModeViewModel.cs).
 - Properties for this phase:
   - `HasAudio` (bool) — true when capture state is `Running` and not in `NoSignal`.
@@ -58,7 +58,7 @@ Implement `MockAudioCaptureService` to generate a 120 BPM kick-style pulse + pin
 - `InitializeAsync()` starts the capture service and sets `IsPlaying = false`; `Dispose`/`Deactivate` stops it.
 - Marshal incoming events onto the UI dispatcher.
 
-### 1.5 `SoundModeView.xaml` — visualizer-only first cut
+### 1.5 `SoundModeView.xaml` — visualizer-only first cut ✅
 - New view under `src/HismithController/UI/Views/SoundModeView.xaml` matching the card layout from `modes.jsx`:
   - Header: "Sound mode" label + "Beats from your system audio drive the device." subline.
   - Visualizer area: an `ItemsControl` bound to `SpectrumBins`, rendering 56 thin vertical bars. Each bar's `Height` (or `ScaleY`) is bound to its magnitude.
@@ -66,12 +66,12 @@ Implement `MockAudioCaptureService` to generate a 120 BPM kick-style pulse + pin
   - Idle overlay (the "Play some music to get started" rings) shown when `!HasAudio`. **Skip** the "Listening to system audio" / "No audio" sublabel from the design — the visualizer itself communicates the listening state, and the overlay covers the silent case.
 - Apply the two-layer drop-shadow card pattern from [CLAUDE.md](CLAUDE.md) — do not put the `DropShadowEffect` on the same border as the text.
 
-### 1.6 Wire the Sound tab into navigation
+### 1.6 Wire the Sound tab into navigation ✅
 - In [MainViewModel.cs](src/HismithController/UI/ViewModels/MainViewModel.cs), extend `OnActiveModeChanged` to set `ActiveModeContent = SoundModeViewModel` when `ActiveMode == "Sound"`.
 - Inject `SoundModeViewModel` into `MainViewModel` constructor and register it in DI.
 - Add a `DataTemplate` mapping `SoundModeViewModel` → `SoundModeView` in `App.xaml`.
 
-### 1.7 Verify Phase 1
+### 1.7 Verify Phase 1 ✅
 - Run the app (`dotnet run --project src/HismithController/HismithController.csproj`), connect to a real or mock Hismith, switch to the Sound tab.
 - Play music in a browser/Spotify — the 56-bar visualizer should respond smoothly with no UI hitching.
 - Stop the music — the idle overlay should appear within ~1 second.

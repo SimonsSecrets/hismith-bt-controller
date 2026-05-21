@@ -16,6 +16,9 @@
         <DataTemplate DataType="{x:Type vm:ManualModeViewModel}">
             <views:ManualModeView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SoundModeViewModel}">
+            <views:SoundModeView />
+        </DataTemplate>
     </UserControl.Resources>
 
     <DockPanel>

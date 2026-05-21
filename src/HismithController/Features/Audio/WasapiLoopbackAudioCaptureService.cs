@@ -33,6 +33,22 @@ internal sealed class WasapiLoopbackAudioCaptureService : IAudioCaptureService
     private int _rmsRingPos;
     private double _rmsSum;
 
+    // Watchdog timer: detects when the WASAPI loopback stops firing DataAvailable
+    // callbacks. WASAPI loopback does NOT fire callbacks during true silence
+    // (hardware-level audio rendering is idle), so UpdateSilenceDetection never
+    // runs and the state would stay at Running indefinitely after music stops.
+    // The watchdog fires every SilenceTimeoutMs/2 ms and checks whether a full
+    // SilenceTimeoutMs has elapsed without any DataAvailable callback; if so, it
+    // clears the RMS ring and forces a NoSignal transition.
+    private System.Threading.Timer? _silenceWatchdog;
+    private long _lastDataTick; // written by audio thread; read by timer thread
+    // 1.5 s chosen so the idle-decay timer in SpectrumAnalyzer has enough time
+    // to bring all bars to the visual floor (0 px) before the overlay appears.
+    // Math: a bin starting at −47.5 dB (75 % bar height) needs ~42 idle-timer
+    // ticks × 35 ms = ~1470 ms to decay below DbFloor (−130 dB). Bars at real-
+    // audio levels (< −60 dB) decay to the floor in well under 1 s.
+    private const int SilenceTimeoutMs = 1500; // 1.5 s without callbacks → NoSignal
+
     // KSDATAFORMAT_SUBTYPE_* GUIDs from the Windows multimedia kernel.
     // WaveFormatExtensible.SubFormat identifies the actual sample layout when
     // the top-level WaveFormat.Encoding is WaveFormatEncoding.Extensible.
@@ -66,11 +82,20 @@ internal sealed class WasapiLoopbackAudioCaptureService : IAudioCaptureService
         _capture.DataAvailable += OnDataAvailable;
         _capture.RecordingStopped += OnRecordingStopped;
 
-        // NAudio's StartRecording() launches a background thread and returns
-        // immediately, so we can transition straight to Running here.
+        // Stay in Starting until the first DataAvailable callback; UpdateSilenceDetection
+        // will transition to Running or NoSignal based on the actual RMS of the first frame.
+        // Transitioning to Running here (before any audio data) would keep HasAudio=true
+        // even during system silence, because WASAPI loopback doesn't fire DataAvailable
+        // callbacks when no audio is actively rendering — the silence check never runs.
         SetState(AudioCaptureState.Starting);
         _capture.StartRecording();
-        SetState(AudioCaptureState.Running);
+
+        // Arm the watchdog. Stamp _lastDataTick now so the watchdog does not
+        // immediately fire before the first DataAvailable callback arrives.
+        Volatile.Write(ref _lastDataTick, Environment.TickCount64);
+        _silenceWatchdog = new System.Threading.Timer(
+            OnSilenceWatchdog, null,
+            dueTime: SilenceTimeoutMs, period: SilenceTimeoutMs / 2);
 
         return Task.CompletedTask;
     }
@@ -86,6 +111,10 @@ internal sealed class WasapiLoopbackAudioCaptureService : IAudioCaptureService
 
         return Task.Run(() =>
         {
+            // Dispose the watchdog first so it cannot fire a state transition
+            // after we have started tearing down the capture pipeline.
+            Interlocked.Exchange(ref _silenceWatchdog, null)?.Dispose();
+
             // Unsubscribe before calling StopRecording so NAudio cannot fire
             // DataAvailable callbacks against a capture object mid-teardown.
             capture.DataAvailable -= OnDataAvailable;
@@ -106,6 +135,10 @@ internal sealed class WasapiLoopbackAudioCaptureService : IAudioCaptureService
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
         if (e.BytesRecorded == 0) return;
+
+        // Refresh the watchdog timestamp on every callback so the timer knows
+        // audio is still actively rendering.
+        Volatile.Write(ref _lastDataTick, Environment.TickCount64);
 
         // Snapshot WaveFormat via _capture? before using it: StopAsync can null
         // _capture on the UI thread while this callback is executing on the
@@ -148,6 +181,29 @@ internal sealed class WasapiLoopbackAudioCaptureService : IAudioCaptureService
             _logger.LogError(e.Exception, "Audio capture stopped unexpectedly.");
             SetState(AudioCaptureState.Error);
         }
+    }
+
+    // ── Silence watchdog ──────────────────────────────────────────────────────
+
+    private void OnSilenceWatchdog(object? _)
+    {
+        // Only act when audio was (or might have been) present.
+        var s = _state;
+        if (s is not (AudioCaptureState.Running or AudioCaptureState.Starting))
+            return;
+
+        long elapsed = Environment.TickCount64 - Volatile.Read(ref _lastDataTick);
+        if (elapsed < SilenceTimeoutMs)
+            return;
+
+        // No DataAvailable callback for SilenceTimeoutMs: the hardware render
+        // stream went idle. Clear the RMS ring so stale energy from the previous
+        // audio session does not bleed into the silence check when audio resumes.
+        Array.Clear(_rmsRing, 0, _rmsRing.Length);
+        _rmsRingPos = 0;
+        _rmsSum     = 0.0;
+
+        SetState(AudioCaptureState.NoSignal);
     }
 
     // ── Decoding ──────────────────────────────────────────────────────────────
@@ -289,9 +345,14 @@ internal sealed class WasapiLoopbackAudioCaptureService : IAudioCaptureService
         double rms      = Math.Sqrt(Math.Max(0.0, _rmsSum) / RmsWindowSamples);
         bool   isSilent = rms < SilenceThreshold;
 
-        if (isSilent  && _state == AudioCaptureState.Running)
+        // Starting is the "pre-first-callback" state. The first DataAvailable always
+        // exits Starting: silent first frame → NoSignal (overlay shown), non-silent →
+        // Running (overlay hidden, bars live). Even with a mostly-empty ring the RMS
+        // denominator is the full window size, so even a single loud callback drives
+        // rms well above SilenceThreshold and exits Starting on the very first frame.
+        if (isSilent && _state is AudioCaptureState.Running or AudioCaptureState.Starting)
             SetState(AudioCaptureState.NoSignal);
-        else if (!isSilent && _state == AudioCaptureState.NoSignal)
+        else if (!isSilent && _state is AudioCaptureState.NoSignal or AudioCaptureState.Starting)
             SetState(AudioCaptureState.Running);
     }
 
