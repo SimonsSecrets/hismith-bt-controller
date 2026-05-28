@@ -20,6 +20,14 @@ public partial class SoundModeViewModel : ObservableObject
     // (200 ms), guaranteeing at least 80 ms of "false" time between beats.
     private readonly DispatcherTimer _beatTickTimer;
 
+    // Bridges the silent gaps between clicks of a sparse source (slow metronome).
+    // The capture service reports NoSignal during these gaps (RMS dips), but a
+    // recent beat means music IS playing. Holds HasAudio=true for one slow-tempo
+    // beat period; if no further beat arrives, falls back to the live RMS state.
+    // 4000 ms ≈ 15 BPM, matching the detector's slowest accepted tempo (MaxIbiMs).
+    private const int AudioHoldMs = 4000;
+    private readonly DispatcherTimer _audioHoldTimer;
+
     // Fired on the UI thread on each beat while IsPlaying, for the code-behind
     // to trigger imperative animations (ring scale + opacity) that cannot be
     // driven cleanly by DataTrigger alone when beats arrive rapidly.
@@ -77,6 +85,9 @@ public partial class SoundModeViewModel : ObservableObject
 
         _beatTickTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
         _beatTickTimer.Tick += OnBeatTickTimerTick;
+
+        _audioHoldTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(AudioHoldMs) };
+        _audioHoldTimer.Tick += OnAudioHoldTimerTick;
     }
 
     public async Task InitializeAsync()
@@ -89,6 +100,8 @@ public partial class SoundModeViewModel : ObservableObject
     {
         IsPlaying = false;   // triggers OnIsPlayingChanged → stops timer + clears BeatTick
         await _audioService.StopAsync();
+        // Stop the hold timer so it cannot fire a HasAudio change after tab exit.
+        _audioHoldTimer.Stop();
         // Reset HasAudio synchronously so the idle overlay appears immediately on re-entry.
         HasAudio = false;
     }
@@ -119,7 +132,11 @@ public partial class SoundModeViewModel : ObservableObject
     {
         Application.Current.Dispatcher.InvokeAsync(() =>
         {
-            HasAudio = state == AudioCaptureState.Running;
+            if (state == AudioCaptureState.Running)
+                HasAudio = true;
+            else if (!_audioHoldTimer.IsEnabled)
+                HasAudio = false;   // no recent beat holding us up → reflect reality
+            // else: a recent beat is holding HasAudio=true; ignore the transient NoSignal.
         });
     }
 
@@ -145,6 +162,12 @@ public partial class SoundModeViewModel : ObservableObject
             // instant the user presses Play, even if they were watching paused.
             LiveBpm = _beatDetector.CurrentBpm;
 
+            // A detected beat means music is playing even if the instant is silent
+            // (sparse/slow source). Keep the overlay hidden and rearm the hold window.
+            HasAudio = true;
+            _audioHoldTimer.Stop();
+            _audioHoldTimer.Start();
+
             if (!IsPlaying) return;
 
             // BeatTick: force a false→true edge even if the previous tick never
@@ -167,5 +190,12 @@ public partial class SoundModeViewModel : ObservableObject
     {
         BeatTick = false;
         _beatTickTimer.Stop();
+    }
+
+    // Hold window expired with no new beat: fall back to the live capture state.
+    private void OnAudioHoldTimerTick(object? sender, EventArgs e)
+    {
+        _audioHoldTimer.Stop();
+        HasAudio = _audioService.State == AudioCaptureState.Running;
     }
 }
