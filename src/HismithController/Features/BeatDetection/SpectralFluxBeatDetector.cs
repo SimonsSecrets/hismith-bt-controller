@@ -154,10 +154,11 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
         _sparsityMetronomeMin = settings.SparsityMetronomeMin;
         _sparsityDenseMax     = settings.SparsityDenseMax;
         _tempoEstimator   = new AutocorrelationTempoEstimator(
-            minBpm:          MinBpm,
-            maxBpm:          MaxBpm,
-            preferredCenter: settings.PreferredBpmCenter,
-            preferredSigma:  settings.PreferredBpmSigma);
+            minBpm:            MinBpm,
+            maxBpm:            MaxBpm,
+            preferredCenter:   settings.PreferredBpmCenter,
+            preferredSigma:    settings.PreferredBpmSigma,
+            recencyTauSeconds: settings.RecencyTauSeconds);
 
         // Lifetime matches the app; unsubscribing / disposal is not needed.
         _audioRunning = audioService.State == AudioCaptureState.Running;

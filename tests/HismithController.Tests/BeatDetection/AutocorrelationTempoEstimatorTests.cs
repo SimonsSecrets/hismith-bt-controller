@@ -116,6 +116,57 @@ public class AutocorrelationTempoEstimatorTests
         Assert.InRange(result.Bpm, 97, 103);
     }
 
+    // Build an OSF whose older half is a `oldBpm` train and whose recent half (the
+    // newest samples) is a `newBpm` train, modelling a metronome that just changed
+    // tempo. Reuses the same triangular onset kernel as ImpulseTrain.
+    private static double[] TempoChangeTrain(double oldBpm, double newBpm, double recentFraction = 0.5)
+    {
+        var osf = new double[OsfLen];
+        int split = (int)(OsfLen * (1.0 - recentFraction));
+        double[] kernel = { 0.5, 1.0, 0.5 };
+
+        void Lay(double bpm, int from, int to)
+        {
+            double pulseSamples = (60_000.0 / bpm) / HopMs;
+            for (int k = 0; ; k++)
+            {
+                int center = from + (int)Math.Round(k * pulseSamples);
+                if (center - 1 >= to) break;
+                for (int j = 0; j < kernel.Length; j++)
+                {
+                    int idx = center - 1 + j;
+                    if (idx >= from && idx < to) osf[idx] = Math.Max(osf[idx], kernel[j]);
+                }
+            }
+        }
+
+        Lay(oldBpm, 0, split);
+        Lay(newBpm, split, OsfLen);
+        return osf;
+    }
+
+    [Fact]
+    public void Analyze_TempoChange_RecencyWeightingTracksRecentTempo()
+    {
+        // Models a high→low metronome change: the older 40 % of the window is still a
+        // 180 BPM train, the recent 60 % is a 70 BPM train. With the default recency
+        // weighting (τ = 2.5 s) the recent slow tempo dominates; with uniform weighting
+        // (τ = 0) the lingering fast tempo still wins because the biased autocorrelation
+        // favours its shorter lag. This is exactly the high→low stickiness the weighting
+        // removes — the new tempo surfaces while it occupies less of the window.
+        var osf = TempoChangeTrain(oldBpm: 180, newBpm: 70, recentFraction: 0.6);
+
+        var weighted = new AutocorrelationTempoEstimator(
+            minBpm: 15.0, maxBpm: 240.0, preferredCenter: 120.0, preferredSigma: 0.5,
+            recencyTauSeconds: 2.5);
+        Assert.InRange(weighted.Analyze(osf, HopMs, fold: false).Bpm, 67, 73);
+
+        var uniform = new AutocorrelationTempoEstimator(
+            minBpm: 15.0, maxBpm: 240.0, preferredCenter: 120.0, preferredSigma: 0.5,
+            recencyTauSeconds: 0.0);
+        Assert.InRange(uniform.Analyze(osf, HopMs, fold: false).Bpm, 177, 183);
+    }
+
     [Fact]
     public void Analyze_EmptyEnvelope_ReturnsZero()
     {

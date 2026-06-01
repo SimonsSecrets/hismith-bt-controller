@@ -209,7 +209,23 @@ periodic input.
 
 ### 5.3 Autocorrelation details and why
 - **Lag range** spans `MinBpm = 15` to `MaxBpm = 240` BPM; `lagMax` is also capped at
-  `N/2` so every lag has enough overlap.
+  `N/2` so every lag has enough overlap. Note this `N/2` cap makes the *real* detectable
+  floor ~20 BPM (a 15 BPM period exceeds half a 6 s window), independent of any weighting.
+- **Recency weighting (`RecencyTauSeconds`, default 2.5 s).** The autocorrelation runs over
+  an exponentially recency-weighted copy of the OSF: weight `w[i] = exp(-(N−1−i)/τ)` with
+  the newest sample at weight 1, folded in as `√w[i]·(x[i] − weightedMean)` so the existing
+  bounded/biased autocorrelation math is unchanged (with `τ ≤ 0` the weights collapse to 1,
+  reproducing the original estimate exactly). **Why:** when the input tempo changes, the old
+  tempo's periodicity otherwise keeps winning the global max until it ages out of the full
+  window — *worst on high→low*, because the biased normalisation (below) favours the old
+  fast tempo's shorter lag, so the readout clings to it even once the new slow tempo is the
+  majority. Weighting decays that stale evidence so the new tempo surfaces while it occupies
+  only ~60 % of the window (~3.5 s after the change) instead of ~80 % (~4.8 s) — and it puts
+  the lingering fast peak in the low-weight region so subharmonic rejection no longer
+  re-promotes it. The window *length* is unchanged, so slow-tempo robustness is preserved;
+  only the *influence* of old samples tapers. Lowering τ reacts faster but shrinks the
+  effective evidence depth (the noise-robustness this whole approach buys, §5.2), so 2.5 s is
+  the conservative default — tune it down per `AppConfig.json` for snappier reaction.
 - **Biased normalization** (`sum / Σdev²`, a constant divisor) rather than unbiased
   (`/(N−lag)`). Biased deliberately favors *shorter* lags, which biases the picked peak
   toward the fundamental. This bias is real but **only ~10 % per octave** (peaks decay
@@ -352,6 +368,7 @@ These guards exist because of concrete bugs:
 |---|---|---|
 | `OnsetMultiplier` | 1.5 | adaptive onset threshold = mean(flux) × this |
 | `OsfWindowSeconds` | 6.0 | OSF history length fed to autocorrelation |
+| `RecencyTauSeconds` | 2.5 | exponential recency-weight time constant for the autocorrelation (lower = snappier reaction to tempo changes, less noise-robust; 0 = uniform/disabled) |
 | `SparsityMetronomeMin` | 0.60 | ≥ ⇒ sparse/metronome (no fold) |
 | `SparsityDenseMax` | 0.40 | ≤ ⇒ dense/song (fold) |
 | `PreferredBpmCenter` | 120 | octave-fold preference center (BPM) |
@@ -378,8 +395,11 @@ These guards exist because of concrete bugs:
 ## 11. Known limitations & possible future work
 
 - **Latency:** autocorrelation needs ~1.5–2 s of audio to lock and updates every 500 ms,
-  so the BPM appears a beat or two after playback starts and reacts to tempo changes over
-  a few seconds. This is the cost of robustness over the (fragile) instantaneous IBI method.
+  so the BPM appears a beat or two after playback starts. Tempo *changes* react over a few
+  seconds; recency weighting (§5.3, `RecencyTauSeconds`) cuts the worst case (high→low) from
+  ~4.8 s to ~3.5 s at the default τ without shrinking the window. This residual lag is the
+  cost of robustness over the (fragile) instantaneous IBI method — fundamentally the
+  estimator must observe ~2 periods of the new tempo before it can lock onto it.
 - **Fast metronomes (>180 BPM)** depend on the sparsity classifier to avoid folding; a
   very reverberant/noisy click could in principle read as dense.
 - **Possible manual mode switch:** letting the user force "Music" (fold) vs "Metronome"

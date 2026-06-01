@@ -20,6 +20,15 @@ public sealed class AppSettings
     // and many beats at fast tempos, trading latency for a stable estimate.
     public double OsfWindowSeconds { get; set; } = 6.0;
 
+    // Recency weighting (seconds): the autocorrelation is computed over an
+    // exponentially recency-weighted copy of the OSF with this time constant, so a
+    // tempo change is not masked by stale old-tempo evidence still in the 6 s window.
+    // Lower ⇒ snappier reaction to tempo changes but noisier; higher ⇒ steadier but
+    // slower. ~2.5 s reacts to a high→low change in ~2–3 s (vs ~6 s) while keeping the
+    // full window so slow tempos still lock. Set to 0 to disable (uniform weighting,
+    // identical to the original behaviour).
+    public double RecencyTauSeconds { get; set; } = 2.5;
+
     // Regime classifier: OSF sparsity = the fraction of hops that are near-silent
     // (below 15 % of the envelope's 99th-percentile peak). A click train (metronome)
     // spends most of its time near the floor between clicks ⇒ high sparsity at ANY

@@ -15,6 +15,12 @@ namespace HismithController.BeatDetection;
 // the candidate harmonic set toward a musical range using a log-BPM Gaussian
 // preference, resolving half/double-tempo without hard-capping.
 //
+// Recency weighting: the autocorrelation is computed over a recency-weighted copy
+// of the envelope (exponential, time constant recencyTauSeconds) so that when the
+// input tempo changes, stale evidence from the old tempo decays quickly instead of
+// dominating until it ages out of the window. This cuts the high→low transition lag
+// without shortening the window (slow tempos still need the full span to lock).
+//
 // Pure and stateless apart from the last result — no threads, no I/O — so it is
 // unit-testable by feeding synthetic OSF arrays (see AutocorrelationTempoEstimatorTests).
 public sealed class AutocorrelationTempoEstimator
@@ -42,17 +48,20 @@ public sealed class AutocorrelationTempoEstimator
     private readonly double _maxBpm;
     private readonly double _preferredCenter;
     private readonly double _preferredSigma;
+    private readonly double _recencyTauSeconds;
 
     public AutocorrelationTempoEstimator(
         double minBpm,
         double maxBpm,
         double preferredCenter,
-        double preferredSigma)
+        double preferredSigma,
+        double recencyTauSeconds = 0.0)
     {
-        _minBpm          = minBpm;
-        _maxBpm          = maxBpm;
-        _preferredCenter = preferredCenter;
-        _preferredSigma  = preferredSigma;
+        _minBpm            = minBpm;
+        _maxBpm            = maxBpm;
+        _preferredCenter   = preferredCenter;
+        _preferredSigma    = preferredSigma;
+        _recencyTauSeconds = recencyTauSeconds;
     }
 
     // Estimate tempo from an OSF snapshot. hopMs is the time between OSF samples.
@@ -74,16 +83,43 @@ public sealed class AutocorrelationTempoEstimator
         if (lagMax <= lagMin)
             return new TempoEstimate(0, 0f);
 
-        double mean = 0.0;
-        for (int i = 0; i < n; i++) mean += osf[i];
-        mean /= n;
+        // Recency weighting: emphasise recent OSF so a tempo change is not masked by
+        // stale evidence still in the window. The snapshot is ordered oldest→newest
+        // (index 0 oldest, n-1 newest), so weight w[i] = exp(-(n-1-i)/τ) gives the
+        // newest sample weight 1 and decays toward the past with time constant τ.
+        // We fold √w into the centred signal (cw[i] = √w[i]·(x[i]-mean)) so the
+        // existing autocorrelation math below is literally the autocorrelation of the
+        // weighted signal — still bounded in ~[-1, 1], same short-lag bias, and the
+        // subharmonic/interpolation/fold steps need no change. With τ ≤ 0 the weights
+        // collapse to 1, reproducing the original unweighted estimate exactly.
+        // The full window length is kept (so slow tempos still have enough span); only
+        // the *influence* of old samples decays, which lets a high→low change surface
+        // once the new tempo fills ~60 % of the window (~3.5 s at the default τ) instead
+        // of ~80 % (~4.8 s) — see documentation/SoundModeImplementation.md §5.3.
+        double tauSamples = _recencyTauSeconds > 0.0 ? _recencyTauSeconds * 1000.0 / hopMs : 0.0;
 
-        // Total squared deviation (= lag-0 autocorrelation) normalises the result
-        // into ~[-1, 1]. A flat/silent envelope has ~zero deviation → no tempo.
+        double[] cw = new double[n];
+
+        // Weighted mean m = Σ w[i]·x[i] / Σ w[i], so the centred signal has weighted
+        // zero mean (the correct DC removal for a weighted autocorrelation).
+        double sumW = 0.0, sumWX = 0.0;
+        for (int i = 0; i < n; i++)
+        {
+            double w = tauSamples > 0.0 ? Math.Exp(-(n - 1 - i) / tauSamples) : 1.0;
+            cw[i] = w;            // stash w; overwritten with √w·(x-mean) in the next pass
+            sumW  += w;
+            sumWX += w * osf[i];
+        }
+        double mean = sumWX / sumW;
+
+        // Total weighted squared deviation (= weighted lag-0 autocorrelation) normalises
+        // the result into ~[-1, 1]. A flat/silent envelope has ~zero deviation → no tempo.
         double sumSq = 0.0;
         for (int i = 0; i < n; i++)
         {
-            double d = osf[i] - mean;
+            double sqrtW = Math.Sqrt(cw[i]);
+            double d     = sqrtW * (osf[i] - mean);
+            cw[i]  = d;
             sumSq += d * d;
         }
         if (sumSq <= 1e-12)
@@ -106,7 +142,7 @@ public sealed class AutocorrelationTempoEstimator
             double sum = 0.0;
             int    cnt = n - lag;
             for (int i = 0; i < cnt; i++)
-                sum += (osf[i] - mean) * (osf[i + lag] - mean);
+                sum += cw[i] * cw[i + lag];
 
             double norm = sum / sumSq;
             ac[lag] = norm;
