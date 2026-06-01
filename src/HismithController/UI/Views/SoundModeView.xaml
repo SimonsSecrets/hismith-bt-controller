@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:HismithController.ViewModels"
+             xmlns:ctrl="clr-namespace:HismithController.Controls"
              xmlns:conv="clr-namespace:HismithController.Converters"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -277,14 +278,16 @@
 
         <!-- ========== LIVE STATS BAR ========== -->
         <!-- Spans the full container width directly below the visualizer.
-             Device and Speed columns show "—" in Phase 2; they will be
-             populated when the device-driving path is wired in Phase 3. -->
+             Music shows the detected tempo; Device/Speed show the post-ratio output
+             (0 while not actively driving). The "÷N" rhythm badge is overlaid centered
+             on the Music↔Device boundary — see the overlay Grid after the stats. -->
         <Grid Margin="0,14,0,0">
             <Border CornerRadius="8"
                     Background="{DynamicResource SurfaceSoftBrush}"
                     BorderBrush="{DynamicResource AppBorderBrush}"
                     BorderThickness="1"
                     Padding="0,9">
+                <Grid>
                 <UniformGrid Rows="1" Columns="3">
 
                     <!-- Music stat -->
@@ -319,7 +322,8 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- Device stat (Phase 2 stub: always "—") -->
+                    <!-- Device stat: post-ratio device BPM. DeviceBpm returns 0 while
+                         not actively driving (paused / silent), matching the design. -->
                     <StackPanel HorizontalAlignment="Center">
                         <TextBlock Text="DEVICE"
                                    FontSize="9" FontWeight="SemiBold"
@@ -328,9 +332,9 @@
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
                                     Margin="0,3,0,0">
-                            <TextBlock Text="—"
+                            <TextBlock Text="{Binding DeviceBpm}"
                                        FontSize="17" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextDimBrush}" />
+                                       Foreground="{DynamicResource TextBrush}" />
                             <TextBlock Text=" bpm"
                                        FontSize="10"
                                        Foreground="{DynamicResource TextDimBrush}"
@@ -339,7 +343,8 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- Speed stat (Phase 2 stub: always "—") -->
+                    <!-- Speed stat: device BPM as a % of the 240 full-scale (design's
+                         fixed reference). DeviceSpeedPercent returns 0 while not driving. -->
                     <StackPanel HorizontalAlignment="Center">
                         <TextBlock Text="SPEED"
                                    FontSize="9" FontWeight="SemiBold"
@@ -348,9 +353,9 @@
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
                                     Margin="0,3,0,0">
-                            <TextBlock Text="—"
+                            <TextBlock Text="{Binding DeviceSpeedPercent}"
                                        FontSize="17" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextDimBrush}" />
+                                       Foreground="{DynamicResource TextBrush}" />
                             <TextBlock Text=" %"
                                        FontSize="10"
                                        Foreground="{DynamicResource TextDimBrush}"
@@ -360,9 +365,115 @@
                     </StackPanel>
 
                 </UniformGrid>
+
+                    <!-- "÷N" rhythm badge. Overlaid on a 3-column grid matching the
+                         stats layout: Column 0 + ColumnSpan 2 centered puts it at the
+                         1/3 mark — exactly the Music↔Device boundary. Visible whenever a
+                         non-1 rhythm is selected, regardless of driving state. -->
+                    <Grid IsHitTestVisible="False"
+                          Visibility="{Binding IsRatioBadgeVisible,
+                                       Converter={StaticResource BoolToVis}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Grid.ColumnSpan="2"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Background="{DynamicResource RoseSoftBrush}"
+                                CornerRadius="8"
+                                Padding="6,1">
+                            <TextBlock Text="{Binding RatioBadgeText}"
+                                       FontSize="10" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource RoseDarkBrush}" />
+                        </Border>
+                    </Grid>
+                </Grid>
             </Border>
 
         </Grid>
+
+        <!-- ========== THRUST RHYTHM SELECTOR ========== -->
+        <!-- Header row: title (left) + muted hint (right). -->
+        <Grid Margin="0,18,0,8">
+            <TextBlock Text="Thrust rhythm"
+                       FontSize="12" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextBrush}"
+                       HorizontalAlignment="Left" VerticalAlignment="Center" />
+            <TextBlock Text="How many beats per stroke"
+                       FontSize="11"
+                       Foreground="{DynamicResource TextDimBrush}"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" />
+        </Grid>
+
+        <!-- Three tiles in a 3-col grid. Each tile is a Button (Command-driven, like
+             the design's onClick) whose active highlight tracks ThrustRhythmOption.IsSelected. -->
+        <ItemsControl ItemsSource="{Binding RhythmOptions}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Rows="1" Columns="3" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Button Margin="4,0"
+                            Cursor="Hand"
+                            Command="{Binding DataContext.SelectRhythmCommand,
+                                      RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Tile"
+                                        CornerRadius="12"
+                                        BorderThickness="1.5"
+                                        BorderBrush="{DynamicResource AppBorderBrush}"
+                                        Background="{DynamicResource SurfaceSoftBrush}"
+                                        Padding="10,12,10,10">
+                                    <StackPanel>
+                                        <!-- Diagram: text-dim normally, rose when active.
+                                             The shapes inside follow this Foreground. -->
+                                        <ctrl:RhythmDiagram x:Name="Diag"
+                                                            Height="32"
+                                                            Ratio="{Binding Ratio}"
+                                                            Foreground="{DynamicResource TextDimBrush}" />
+                                        <TextBlock x:Name="Lab"
+                                                   Text="{Binding Label}"
+                                                   FontSize="12.5" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextBrush}"
+                                                   Margin="0,6,0,0" />
+                                        <TextBlock Text="{Binding Description}"
+                                                   FontSize="10.5" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource TextDimBrush}"
+                                                   Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <!-- Hover: rose border + rose-soft fill (design .rhythm-tile:hover). -->
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Tile" Property="BorderBrush"
+                                                Value="{DynamicResource RoseBrush}" />
+                                        <Setter TargetName="Tile" Property="Background"
+                                                Value="{DynamicResource RoseSoftBrush}" />
+                                    </Trigger>
+                                    <!-- Active: rose border + rose-soft fill, rose diagram,
+                                         rose-dark label (design .rhythm-tile.active). -->
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter TargetName="Tile" Property="BorderBrush"
+                                                Value="{DynamicResource RoseBrush}" />
+                                        <Setter TargetName="Tile" Property="Background"
+                                                Value="{DynamicResource RoseSoftBrush}" />
+                                        <Setter TargetName="Diag" Property="Foreground"
+                                                Value="{DynamicResource RoseBrush}" />
+                                        <Setter TargetName="Lab" Property="Foreground"
+                                                Value="{DynamicResource RoseDarkBrush}" />
+                                    </DataTrigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
     </StackPanel>
 </UserControl>

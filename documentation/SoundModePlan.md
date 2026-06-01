@@ -131,7 +131,7 @@ Approach: **beat-count window, not time window, plus explicit change detection.*
 - Add the **Live stats bar** stub with just the "Music" stat populated (Device/Speed columns can show `—` for now).
 - Add the Play/Pause button bound to `IsDrivingDevice` (no device wiring yet — just the bool and the visual "Detection paused" badge).
 
-### 2.6 Verify Phase 2
+### 2.6 Verify Phase 2 ✅
 - Play tracks with known tempos (e.g. a 120 BPM electronic track, a 90 BPM hip-hop track). The displayed BPM should settle within ~3–5 seconds and stay within ±2 BPM of truth.
 - The beat ring should flash visibly on kicks.
 - Pause/resume should freeze the BPM and beat ring but keep bars moving.
@@ -185,7 +185,7 @@ Approach: **beat-count window, not time window, plus explicit change detection.*
 
 **Goal:** Expose the two user-tunable parameters from the design — Max device speed and Thrust rhythm — and apply them in the mapper.
 
-### 4.1 Thrust rhythm selector
+### 4.1 Thrust rhythm selector ✅
 - Add a `ThrustRhythm` enum and `ThrustRhythmOption` view-model record:
   - `EveryBeat` (ratio 1), `EveryTwoBeats` (ratio 2), `EveryFourBeats` (ratio 4).
 - `SoundModeViewModel` properties:

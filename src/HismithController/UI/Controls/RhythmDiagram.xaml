@@ -1,0 +1,11 @@
+<UserControl x:Class="HismithController.Controls.RhythmDiagram"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- A 96×32 abstract sine "stroke-cycle" diagram, scaled to fill the tile's
+         32 px .diag slot. Children are built in code from the Ratio DP — see the
+         code-behind, a direct port of modes.jsx RhythmDiagram. Stretch="Fill"
+         matches the design's preserveAspectRatio="none". -->
+    <Viewbox Stretch="Fill">
+        <Canvas x:Name="Surface" Width="96" Height="32" />
+    </Viewbox>
+</UserControl>

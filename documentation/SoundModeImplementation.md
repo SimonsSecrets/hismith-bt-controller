@@ -362,6 +362,27 @@ These guards exist because of concrete bugs:
   — the Music BPM readout updates whenever `HasAudio`, independent of the play/pause toggle.
 - All audio-thread callbacks marshal to the dispatcher before touching observable state.
 
+### 8.1 Thrust rhythm → device BPM (Phase 4.1)
+
+- **`ThrustRhythm`** (`Features/SoundMode/ThrustRhythm.cs`) — `EveryBeat`/`EveryTwoBeats`/`EveryFourBeats`.
+  The enum's integer value **is** the divider ratio, so it casts straight to `int`.
+- **`BeatToDeviceMapper.Map(musicBpm, rhythm)`** (`Features/SoundMode/BeatToDeviceMapper.cs`) —
+  pure, stateless: `deviceBpm = round(musicBpm / ratio)`. No `IDevice` dependency, no ramp, no cap.
+  The §4.2 max-speed cap slots in here later as `Math.Min(.., maxBpm)`.
+- `SoundModeViewModel` exposes the read-only `RhythmOptions` tiles (each a `ThrustRhythmOption`
+  with an `IsSelected` flag tracked exactly like `PresetItem.IsActive`), the `SelectedRhythm`
+  enum, and the computed display stats `DeviceBpm` / `DeviceSpeedPercent` / `IsRatioBadgeVisible` /
+  `RatioBadgeText`. `DeviceSpeedPercent` uses the design's fixed **240 BPM** full-scale, not
+  `IDevice.BpmToPercent` — the device dependency belongs to Phase 3.
+- **The mapping is display-only right now.** Phase 3 (sending `deviceBpm` to the BLE device) and
+  §4.2/§4.3 (max-speed cap + persistence) are **not** implemented. `DeviceBpm`/`DeviceSpeedPercent`
+  return **0 unless `IsActivelyDriving`** (audio present **and** Play engaged), matching the design's
+  paused-state behaviour. The `÷N` rhythm badge **deviates from the design**: it is shown centered
+  on the Music↔Device boundary (not next to the Device number) and is visible whenever a
+  non-`EveryBeat` ratio is selected, independent of the driving state.
+- The `RhythmDiagram` control (`UI/Controls/RhythmDiagram.xaml`) ports the design's SVG sine
+  diagram: one full sine period per `Ratio` beats over a 96×32 surface, scaled by a `Viewbox`.
+
 ---
 
 ## 9. Tunables (`AppSettings`)
@@ -391,6 +412,8 @@ These guards exist because of concrete bugs:
 - **`MockSignalBeatDetectionTests`** — real-time integration (paced in wall-clock because
   the onset gate uses `Environment.TickCount64`): a clean metronome locks to its true
   tempo; `NoSignal` frames fire no phantom beats; `Stopped` resets the readout.
+- **`BeatToDeviceMapperTests`** — the pure ratio + rounding math (pass-through, half, quarter,
+  zero, and the banker's-rounding midpoint case).
 
 ---
 

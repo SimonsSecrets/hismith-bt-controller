@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HismithController.Audio;
 using HismithController.BeatDetection;
+using HismithController.SoundMode;
 
 namespace HismithController.ViewModels;
 
@@ -48,6 +49,8 @@ public partial class SoundModeViewModel : ObservableObject
     // True when the audio service reports Running and signal is above silence threshold.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsActivelyDriving))]
+    [NotifyPropertyChangedFor(nameof(DeviceBpm))]
+    [NotifyPropertyChangedFor(nameof(DeviceSpeedPercent))]
     private bool _hasAudio;
 
     // User-controlled gate for sending detected beats to the device. Reset to
@@ -56,12 +59,25 @@ public partial class SoundModeViewModel : ObservableObject
     // beat detection: the visualizer and BPM readout keep updating regardless.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsActivelyDriving))]
+    [NotifyPropertyChangedFor(nameof(DeviceBpm))]
+    [NotifyPropertyChangedFor(nameof(DeviceSpeedPercent))]
     private bool _isDrivingDevice;
 
     // Current music BPM from the beat detector; updated on every detected beat
     // regardless of IsDrivingDevice so the readout is always current.
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DeviceBpm))]
+    [NotifyPropertyChangedFor(nameof(DeviceSpeedPercent))]
     private int _liveBpm;
+
+    // Thrust rhythm: how many detected beats make up one device stroke. Divides the
+    // music BPM down to the device BPM (see BeatToDeviceMapper). Defaults to EveryBeat.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DeviceBpm))]
+    [NotifyPropertyChangedFor(nameof(DeviceSpeedPercent))]
+    [NotifyPropertyChangedFor(nameof(IsRatioBadgeVisible))]
+    [NotifyPropertyChangedFor(nameof(RatioBadgeText))]
+    private ThrustRhythm _selectedRhythm = ThrustRhythm.EveryBeat;
 
     // Flips true on each beat while actively driving; reset to false after ~120 ms
     // by _beatTickTimer. Drives the live-dot DataTrigger in the view and keeps the
@@ -73,6 +89,32 @@ public partial class SoundModeViewModel : ObservableObject
     // signal AND the user has enabled device driving. Gates the device-side stats
     // (Device/Speed) and the BPM-paced beat pulse.
     public bool IsActivelyDriving => HasAudio && IsDrivingDevice;
+
+    // Device BPM the rhythm divider would apply to the device (Phase 3 not wired yet,
+    // so this only feeds the stats display). 0 unless actively driving — matches the
+    // design, where the device columns read 0 while paused / silent.
+    public int DeviceBpm => IsActivelyDriving ? BeatToDeviceMapper.Map(LiveBpm, SelectedRhythm) : 0;
+
+    // Device speed as a percentage of the design's fixed 240 BPM full-scale. Uses the
+    // same 240 reference as modes.jsx rather than IDevice.BpmToPercent — the device
+    // dependency belongs to Phase 3.
+    public int DeviceSpeedPercent => IsActivelyDriving ? (int)Math.Round(DeviceBpm / 240.0 * 100) : 0;
+
+    // The "÷N" rhythm badge (shown centered between the Music and Device stats) is
+    // visible whenever a non-1 rhythm is selected — independent of the driving state,
+    // so the user can see the active divider even while paused. Deviates from the
+    // design, which gated it on driving and placed it next to the Device number.
+    public bool IsRatioBadgeVisible => SelectedRhythm != ThrustRhythm.EveryBeat;
+
+    public string RatioBadgeText => $"÷{(int)SelectedRhythm}";
+
+    // The three thrust-rhythm tiles, built once. Labels/descriptions match design §6.3.
+    public ObservableCollection<ThrustRhythmOption> RhythmOptions { get; } =
+    [
+        new(ThrustRhythm.EveryBeat,     "Every beat",    "Thrust on every beat"),
+        new(ThrustRhythm.EveryTwoBeats, "Every 2 beats", "Forward on 1, back on 2 — fuller stroke"),
+        new(ThrustRhythm.EveryFourBeats,"Every 4 beats", "Two beats forward, two back — drawn-out"),
+    ];
 
     // 56 logarithmic frequency bins, each clamped to [0, 1].
     // SpectrumBin is a reference type so {Binding Value} on the bar Border
@@ -104,6 +146,8 @@ public partial class SoundModeViewModel : ObservableObject
 
         _pulseTimer = new DispatcherTimer();
         _pulseTimer.Tick += OnPulseTimerTick;
+
+        UpdateRhythmSelection();
     }
 
     public async Task InitializeAsync()
@@ -127,6 +171,23 @@ public partial class SoundModeViewModel : ObservableObject
     {
         IsDrivingDevice = !IsDrivingDevice;
     }
+
+    [RelayCommand]
+    private void SelectRhythm(ThrustRhythmOption option)
+    {
+        if (option is null) return;
+        SelectedRhythm = option.Rhythm;
+    }
+
+    // Keeps each tile's IsSelected flag in sync with SelectedRhythm so the active-tile
+    // highlight (a DataTrigger on IsSelected) tracks the current choice.
+    private void UpdateRhythmSelection()
+    {
+        foreach (var option in RhythmOptions)
+            option.IsSelected = option.Rhythm == SelectedRhythm;
+    }
+
+    partial void OnSelectedRhythmChanged(ThrustRhythm value) => UpdateRhythmSelection();
 
     // Called by the global emergency stop. Disables device driving so no further
     // BPM is sent until the user opts back in; the bound play/pause button flips
