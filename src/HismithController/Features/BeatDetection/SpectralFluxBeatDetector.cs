@@ -5,17 +5,26 @@ using HismithController.Configuration;
 namespace HismithController.BeatDetection;
 
 // Detects beats via positive spectral flux in the kick/bass frequency band and
-// feeds the resulting inter-beat intervals to a BpmEstimator.
+// estimates tempo from the periodicity of the onset-strength envelope (OSF).
 //
 // Algorithm: for every hop of HopSize new samples, a 512-point FFT is computed
 // over the most recent FftSize samples (50 % overlap). Spectral flux is the sum
 // of positive magnitude differences in the low-frequency bins since the previous
-// hop. An onset is declared when flux exceeds an adaptive threshold (mean of the
-// last 40 flux values × OnsetMultiplier) and the min inter-onset gap has elapsed.
+// hop. An onset (BeatDetected, for the visual pulse / liveness) is declared when a
+// flux local maximum exceeds an adaptive threshold (mean of the last 40 flux values
+// × OnsetMultiplier) and the min inter-onset gap has elapsed.
 //
-// Threading: all processing runs synchronously on the NAudio audio capture
-// thread (IAudioCaptureService.SamplesAvailable). BeatDetected subscribers must
-// not block and must marshal UI / BLE work off this thread.
+// Tempo (CurrentBpm) is NOT derived from discrete onset intervals — those jitter
+// badly on real input (e.g. a metronome tick with little low-frequency energy).
+// Instead each hop's flux is appended to a continuous OSF, and a background timer
+// runs AutocorrelationTempoEstimator over it: robust to noisy onsets because it
+// keys off the dominant period, not individual detections. A sparsity classifier
+// decides only whether to octave-fold (dense music) or not (sparse click train).
+//
+// Threading: flux/onset processing runs synchronously on the NAudio audio capture
+// thread (IAudioCaptureService.SamplesAvailable); the autocorrelation runs on a
+// System.Threading.Timer thread. BeatDetected subscribers must not block and must
+// marshal UI / BLE work off the audio thread.
 public sealed class SpectralFluxBeatDetector : IBeatDetector
 {
     // FFT size 512: frequency resolution = 44100/512 ≈ 86.1 Hz/bin.
@@ -24,6 +33,16 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     private const int HopSize    = 256;
     private const int FftM       = 9;   // log2(512)
     private const int SampleRate = 44100;
+
+    // Time between consecutive hops / OSF samples: 256/44100 ≈ 5.805 ms.
+    private const double HopMs = HopSize * 1000.0 / SampleRate;
+
+    // Supported tempo range, shared by both estimators.
+    private const double MinBpm = 15.0;
+    private const double MaxBpm = 240.0;
+
+    // Autocorrelation recompute cadence (off the audio thread).
+    private const int TempoIntervalMs = 500;
 
     // Low-frequency band for kick/bass onset detection: 0–300 Hz.
     // At 44100/512 ≈ 86.1 Hz/bin this covers FFT bins 1, 2, 3 (~86, 172, 258 Hz).
@@ -35,18 +54,11 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     // Adaptive threshold: mean of the last FluxHistoryLen flux values × multiplier.
     private const int FluxHistoryLen = 40;
 
-    // 200 ms minimum between onsets caps detection at 300 BPM and suppresses
-    // double-triggers on the same transient across adjacent hops.
+    // 200 ms minimum between onsets caps the visual pulse rate at 300 BPM and
+    // suppresses double-triggers on the same transient across adjacent hops.
     private const double MinInterOnsetMs = 200.0;
 
-    // IBIs above this value indicate a long gap (e.g. audio service restarted)
-    // rather than a genuine slow tempo. 60000/15 ≈ 4000 ms corresponds to 15 BPM,
-    // the stated minimum; anything larger resets the estimator instead of being
-    // fed in as a "very slow" IBI that would skew the BPM estimate for many beats.
-    private const double MaxIbiMs = 60_000.0 / 15.0; // ≈ 4000 ms
-
-    private readonly float        _onsetMultiplier;
-    private readonly BpmEstimator _bpmEstimator;
+    private readonly float _onsetMultiplier;
 
     // ── Ring buffer ───────────────────────────────────────────────────────────
     // _ringWritePos points to the oldest sample (= next slot to overwrite).
@@ -70,13 +82,58 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     private int _fluxHistoryPos;
     private int _fluxHistoryCount;
 
+    // Peak-picking neighbourhood: the two most recent prior flux values. An onset
+    // is only fired when the middle of three consecutive hops is a local maximum,
+    // which suppresses the every-frame triggering that pinned dense music at the
+    // 200 ms gate floor. _fluxPrev1 is one hop old, _fluxPrev2 two hops old.
+    private double _fluxPrev1;
+    private double _fluxPrev2;
+
     // Last beat TickCount64 (ms). 0 until the first beat is detected.
     private long _lastBeatTick;
 
-    public int   CurrentBpm => _bpmEstimator.CurrentBpm;
+    // True only while the capture service reports Running (signal above the −80 dBFS
+    // silence floor). The service also publishes near-silent NoSignal frames for the
+    // spectrum visualiser; gating onset firing on this flag stops the adaptive
+    // threshold from collapsing on silence and emitting phantom beats (which would
+    // pin BPM and keep the idle overlay hidden). Written from the capture thread via
+    // StateChanged, read on the audio thread.
+    private volatile bool _audioRunning;
+
+    // ── Onset-strength envelope (OSF) for autocorrelation tempo estimation ───────
+    // Continuous per-hop flux history (~OsfWindowSeconds). Written on the audio
+    // thread, snapshot-copied by the tempo timer thread under _osfLock.
+    private readonly double[] _osf;
+    private readonly object   _osfLock = new();
+    private int _osfWritePos;
+    private int _osfCount;
+
+    private readonly AutocorrelationTempoEstimator _tempoEstimator;
+    private readonly double _sparsityMetronomeMin;
+    private readonly double _sparsityDenseMax;
+
+    // Recomputes tempo every TempoIntervalMs off the audio thread so the O(lag×n)
+    // autocorrelation never runs inside the <5 ms/hop audio budget.
+    private readonly System.Threading.Timer _tempoTimer;
+
+    // Tempo result, written by the tempo timer thread, read by UI threads.
+    private volatile int   _autoBpm;
+    private volatile float _autoConf;
+
+    // Octave-fold hysteresis state. Touched only by the tempo timer thread.
+    private bool _foldDense;
+
+    // Tempo is estimated by autocorrelation of the onset-strength envelope in BOTH
+    // regimes. Autocorrelation recovers the dominant period robustly even when the
+    // discrete onset detector is noisy (e.g. a metronome tick carrying little low-
+    // frequency energy, where IBI-from-onsets jitters wildly). The sparsity
+    // classifier only decides whether to octave-fold (dense music) or not (sparse
+    // metronome — preserving the full 15–240 BPM range). The discrete onsets now
+    // feed only BeatDetected (the visual pulse / liveness), not the BPM value.
+    public int   CurrentBpm => _autoBpm;
     // BPM estimation confidence — distinct from per-onset detection strength,
     // which is carried separately in BeatEventArgs.Confidence.
-    public float Confidence => _bpmEstimator.Confidence;
+    public float Confidence => _autoConf;
 
     public event EventHandler<BeatEventArgs>? BeatDetected;
 
@@ -84,14 +141,45 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     {
         _onsetMultiplier = (float)settings.OnsetMultiplier;
         _hannWindow      = BuildHannWindow(FftSize);
-        _bpmEstimator    = new BpmEstimator(
-            k:                   settings.BpmWindowK,
-            deviationThreshold:  settings.BpmDeviationThreshold,
-            confirmTolerance:    settings.BpmConfirmationTolerance,
-            emaAlpha:            settings.BpmEmaAlpha);
 
-        // Lifetime matches the app; unsubscribing is not needed.
+        int osfLen = Math.Max(64, (int)Math.Round(settings.OsfWindowSeconds * SampleRate / HopSize));
+        _osf = new double[osfLen];
+
+        _sparsityMetronomeMin = settings.SparsityMetronomeMin;
+        _sparsityDenseMax     = settings.SparsityDenseMax;
+        _tempoEstimator   = new AutocorrelationTempoEstimator(
+            minBpm:          MinBpm,
+            maxBpm:          MaxBpm,
+            preferredCenter: settings.PreferredBpmCenter,
+            preferredSigma:  settings.PreferredBpmSigma);
+
+        // Lifetime matches the app; unsubscribing / disposal is not needed.
+        _audioRunning = audioService.State == AudioCaptureState.Running;
         audioService.SamplesAvailable += OnSamplesAvailable;
+        audioService.StateChanged     += OnAudioStateChanged;
+        _tempoTimer = new System.Threading.Timer(OnTempoTimer, null, TempoIntervalMs, TempoIntervalMs);
+    }
+
+    // Capture-thread callback. Tracks the running flag and, on a full stop, drops all
+    // accumulated state so the readout does not linger on the last tempo after the
+    // source goes away. NoSignal (a transient silent gap, e.g. a slow metronome) is
+    // deliberately NOT reset — MaxIbiMs already bridges those gaps for the estimate.
+    private void OnAudioStateChanged(object? sender, AudioCaptureState state)
+    {
+        _audioRunning = state == AudioCaptureState.Running;
+
+        if (state is AudioCaptureState.Stopped or AudioCaptureState.Error)
+        {
+            _lastBeatTick = 0;
+            _autoBpm      = 0;
+            _autoConf     = 0f;
+            _foldDense    = false;
+            lock (_osfLock)
+            {
+                _osfWritePos = 0;
+                _osfCount    = 0;
+            }
+        }
     }
 
     // ── Audio thread ──────────────────────────────────────────────────────────
@@ -168,9 +256,31 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
         _fluxHistoryPos = (_fluxHistoryPos + 1) % FluxHistoryLen;
         if (_fluxHistoryCount < FluxHistoryLen) _fluxHistoryCount++;
 
-        // Require a minimal history before triggering to avoid false positives
-        // during the initial fill period.
+        // Append flux to the continuous onset-strength envelope for the tempo timer.
+        lock (_osfLock)
+        {
+            _osf[_osfWritePos] = flux;
+            _osfWritePos = (_osfWritePos + 1) % _osf.Length;
+            if (_osfCount < _osf.Length) _osfCount++;
+        }
+
+        // Peak-picking: the onset candidate is the *previous* hop's flux, so we can
+        // test it against both neighbours (one hop of look-ahead). Shift the window
+        // after capturing the three values.
+        double cand  = _fluxPrev1;
+        double left  = _fluxPrev2;
+        double right = flux;
+        _fluxPrev2 = _fluxPrev1;
+        _fluxPrev1 = flux;
+
+        // Require minimal history (also guarantees prev1/prev2 are populated) to
+        // avoid false positives during the initial fill period.
         if (_fluxHistoryCount < 3) return;
+
+        // Do not declare onsets on silence/NoSignal frames: the signal is below the
+        // −80 dBFS floor there, so any threshold crossing is noise. The OSF was still
+        // appended above so the tempo analysis keeps an accurate picture of the gaps.
+        if (!_audioRunning) return;
 
         double fluxMean = 0.0;
         for (int i = 0; i < _fluxHistoryCount; i++)
@@ -178,31 +288,86 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
         fluxMean /= _fluxHistoryCount;
 
         double threshold = fluxMean * _onsetMultiplier;
-        if (threshold <= 0.0 || flux <= threshold) return;
+        if (threshold <= 0.0) return;
 
-        // Min inter-onset interval guard.
+        // Local-maximum test: only the peak of a rising-then-falling flux run fires,
+        // not every frame that happens to sit above the adaptive threshold.
+        bool isLocalMax = cand > left && cand >= right;
+        if (!isLocalMax || cand <= threshold) return;
+
+        // Min inter-onset interval guard (also caps the visual pulse rate).
         long   now     = Environment.TickCount64;
         double elapsed = _lastBeatTick == 0 ? double.MaxValue : now - _lastBeatTick;
         if (elapsed < MinInterOnsetMs) return;
-
-        // Feed the inter-beat interval to the BPM estimator.
-        if (_lastBeatTick != 0)
-        {
-            if (elapsed < MaxIbiMs)
-                _bpmEstimator.AddIbi(elapsed);
-            else
-                // Long gap (e.g. audio paused / restarted): stale history would
-                // skew the estimate for many beats; better to restart fresh.
-                _bpmEstimator.Reset();
-        }
 
         _lastBeatTick = now;
 
         // Onset confidence: how far above the adaptive threshold this peak was.
         // 0 = just at threshold, 1 = 2× threshold.
-        float conf = (float)Math.Min(1.0, (flux / threshold - 1.0) * 2.0);
+        float conf = (float)Math.Min(1.0, (cand / threshold - 1.0) * 2.0);
 
         BeatDetected?.Invoke(this, new BeatEventArgs(DateTimeOffset.UtcNow, conf));
+    }
+
+    // ── Tempo timer thread ──────────────────────────────────────────────────────
+
+    // Runs every TempoIntervalMs on a ThreadPool thread. Snapshots the OSF, then
+    // estimates tempo by autocorrelation. Sparsity decides only whether to octave-
+    // fold: dense music is folded toward a musical range; a sparse click train is
+    // left unfolded so it keeps its true tempo across the full 15–240 BPM range.
+    private void OnTempoTimer(object? state)
+    {
+        double[] snapshot;
+        lock (_osfLock)
+        {
+            // Need at least a quarter window before the estimate is meaningful.
+            if (_osfCount < _osf.Length / 4)
+                return;
+
+            int size  = _osf.Length;
+            int count = _osfCount;
+            int start = count < size ? 0 : _osfWritePos;
+            snapshot  = new double[count];
+            for (int i = 0; i < count; i++)
+                snapshot[i] = _osf[(start + i) % size];
+        }
+
+        // OSF sparsity distinguishes a click train (mostly near-silent between clicks
+        // ⇒ high, at any tempo and over a noise floor) from continuous music (envelope
+        // stays elevated ⇒ low). Hysteresis band prevents regime flapping.
+        double sparsity = ComputeSparsity(snapshot);
+
+        if (sparsity <= _sparsityDenseMax)
+            _foldDense = true;
+        else if (sparsity >= _sparsityMetronomeMin)
+            _foldDense = false;
+
+        var est = _tempoEstimator.Analyze(snapshot, HopMs, fold: _foldDense);
+        _autoBpm  = est.Bpm;
+        _autoConf = est.Confidence;
+    }
+
+    // Fraction of OSF hops that are near-silent: below 15 % of the 99th-percentile
+    // peak. ~0.8–1.0 for a click train (long quiet gaps between clicks, at any tempo)
+    // and ~0–0.2 for continuous music (envelope rarely drops near the floor). The
+    // 99th percentile (rather than the raw max) is used as the peak reference so a
+    // single outlier hop cannot distort the threshold. Runs off the audio thread.
+    public static double ComputeSparsity(ReadOnlySpan<double> osf)
+    {
+        int n = osf.Length;
+        if (n < 10) return 1.0;
+
+        double[] sorted = osf.ToArray();
+        Array.Sort(sorted);
+        double peak = sorted[(int)(0.99 * (n - 1))];
+        if (peak <= 1e-9) return 1.0; // silence → treat as sparse
+
+        double threshold = 0.15 * peak;
+        int below = 0;
+        for (int i = 0; i < n; i++)
+            if (osf[i] < threshold) below++;
+
+        return (double)below / n;
     }
 
     // Store current low-band magnitudes as the baseline for the next hop's flux.
