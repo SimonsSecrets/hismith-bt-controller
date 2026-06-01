@@ -3,8 +3,8 @@ namespace HismithController.BeatDetection;
 // Estimates tempo from the *periodicity* of a continuous onset-strength envelope
 // (OSF) via autocorrelation, rather than from discrete inter-beat intervals.
 //
-// Why this exists: the IBI-median BpmEstimator assumes every detected onset is a
-// beat. That holds for a metronome but not for real music, where onsets land on
+// Why this exists: an inter-beat-interval (IBI) median assumes every detected
+// onset is a beat. That holds for a metronome but not for real music, where onsets land on
 // many metrical subdivisions (eighths, sixteenths, syncopation) plus noise. For
 // such dense content the only reliable tempo cue is the dominant period of the
 // onset envelope, which autocorrelation recovers regardless of which subdivisions

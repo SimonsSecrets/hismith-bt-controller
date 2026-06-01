@@ -4,7 +4,7 @@ namespace HismithController.Tests.BeatDetection;
 
 // AutocorrelationTempoEstimator is a pure function over an onset-strength envelope
 // (OSF). Tests synthesise OSF impulse trains for known tempos and assert on the
-// estimated BPM, mirroring the synthetic-input style of BpmEstimatorTests.
+// estimated BPM.
 public class AutocorrelationTempoEstimatorTests
 {
     // Matches SpectralFluxBeatDetector: 256-sample hop at 44100 Hz ≈ 5.805 ms.
