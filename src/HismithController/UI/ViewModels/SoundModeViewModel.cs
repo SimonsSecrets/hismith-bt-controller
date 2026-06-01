@@ -40,38 +40,39 @@ public partial class SoundModeViewModel : ObservableObject
     // value, while still re-syncing on an actual tempo change.
     private int _pulseTimerBpm;
 
-    // Fired on the UI thread on each beat while IsPlaying, for the code-behind
-    // to trigger imperative animations (ring scale + opacity) that cannot be
-    // driven cleanly by DataTrigger alone when beats arrive rapidly.
+    // Fired on the UI thread on each beat while driving the device, for the
+    // code-behind to trigger imperative animations (ring scale + opacity) that
+    // cannot be driven cleanly by DataTrigger alone when beats arrive rapidly.
     public event Action? BeatPulse;
 
     // True when the audio service reports Running and signal is above silence threshold.
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasLiveStats))]
+    [NotifyPropertyChangedFor(nameof(IsActivelyDriving))]
     private bool _hasAudio;
 
-    // User-controlled gate: reset to false on every tab activation so the user
-    // must press Play explicitly — avoids startling them with device activity.
-    // Pausing does NOT stop capture or beat detection — the visualizer keeps moving.
+    // User-controlled gate for sending detected beats to the device. Reset to
+    // false on every tab activation so the user must opt in explicitly — avoids
+    // startling them with device activity. Disabling it does NOT stop capture or
+    // beat detection: the visualizer and BPM readout keep updating regardless.
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasLiveStats))]
-    private bool _isPlaying;
+    [NotifyPropertyChangedFor(nameof(IsActivelyDriving))]
+    private bool _isDrivingDevice;
 
     // Current music BPM from the beat detector; updated on every detected beat
-    // regardless of IsPlaying so the readout is current the moment Play is pressed.
+    // regardless of IsDrivingDevice so the readout is always current.
     [ObservableProperty]
     private int _liveBpm;
 
-    // Flips true on each beat when IsPlaying; reset to false after ~120 ms by
-    // _beatTickTimer. Drives the live-dot DataTrigger in the view and keeps the
+    // Flips true on each beat while actively driving; reset to false after ~120 ms
+    // by _beatTickTimer. Drives the live-dot DataTrigger in the view and keeps the
     // bool cycling (false→true) so DataTriggers always see the edge.
     [ObservableProperty]
     private bool _beatTick;
 
-    // True when the live stats bar should show real values rather than dashes.
-    // HasAudio ensures at least one beat has been heard; IsPlaying ensures the
-    // user has opted in to beat-driven behaviour.
-    public bool HasLiveStats => HasAudio && IsPlaying;
+    // True when the device is actually being driven from live audio: there is a
+    // signal AND the user has enabled device driving. Gates the device-side stats
+    // (Device/Speed) and the BPM-paced beat pulse.
+    public bool IsActivelyDriving => HasAudio && IsDrivingDevice;
 
     // 56 logarithmic frequency bins, each clamped to [0, 1].
     // SpectrumBin is a reference type so {Binding Value} on the bar Border
@@ -107,13 +108,13 @@ public partial class SoundModeViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
-        IsPlaying = false;
+        IsDrivingDevice = false;
         await _audioService.StartAsync();
     }
 
     public async Task DeactivateAsync()
     {
-        IsPlaying = false;   // triggers OnIsPlayingChanged → stops timer + clears BeatTick
+        IsDrivingDevice = false;   // triggers OnIsDrivingDeviceChanged → stops timer + clears BeatTick
         await _audioService.StopAsync();
         // Stop the hold timer so it cannot fire a HasAudio change after tab exit.
         _audioHoldTimer.Stop();
@@ -122,14 +123,20 @@ public partial class SoundModeViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void TogglePlaying()
+    private void ToggleDrivingDevice()
     {
-        IsPlaying = !IsPlaying;
+        IsDrivingDevice = !IsDrivingDevice;
     }
+
+    // Called by the global emergency stop. Disables device driving so no further
+    // BPM is sent until the user opts back in; the bound play/pause button flips
+    // back to its "off" state and OnIsDrivingDeviceChanged stops the pulse + tick.
+    // Capture and beat detection keep running (same as a normal toggle-off).
+    public void ForceStop() => IsDrivingDevice = false;
 
     // ── Property-change side effects ───────────────────────────────────────────
 
-    partial void OnIsPlayingChanged(bool value)
+    partial void OnIsDrivingDeviceChanged(bool value)
     {
         if (!value)
         {
@@ -145,16 +152,16 @@ public partial class SoundModeViewModel : ObservableObject
     // LiveBpm changed → re-pace the pulse so the ring/dot keep tracking the readout.
     partial void OnLiveBpmChanged(int value) => UpdatePulseTimer();
 
-    // Audio came or went → start/stop the pulse alongside the live-stats gate.
+    // Audio came or went → start/stop the pulse alongside the driving gate.
     partial void OnHasAudioChanged(bool value) => UpdatePulseTimer();
 
     // (Re)starts or stops the BPM-driven pulse timer to match the current state.
-    // Pulses only while the live stats are showing (playing + audio) and a tempo is
-    // known; restarts only on an actual BPM change to avoid continually resetting the
-    // pulse phase as LiveBpm re-reports the same value every beat.
+    // Pulses only while actively driving (device-driving enabled + audio) and a
+    // tempo is known; restarts only on an actual BPM change to avoid continually
+    // resetting the pulse phase as LiveBpm re-reports the same value every beat.
     private void UpdatePulseTimer()
     {
-        if (HasLiveStats && LiveBpm > 0)
+        if (IsActivelyDriving && LiveBpm > 0)
         {
             if (_pulseTimerBpm == LiveBpm && _pulseTimer.IsEnabled) return;
 

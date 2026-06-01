@@ -24,7 +24,10 @@
                    Margin="0,2,0,14" />
 
         <!-- ========== VISUALIZER ========== -->
-        <Border CornerRadius="8" Height="90" ClipToBounds="True"
+        <!-- x:Name lets the centered transport button bind to this Border's
+             IsMouseOver so the pause control reveals on hover while playing. -->
+        <Border x:Name="Visualizer"
+                CornerRadius="8" Height="90" ClipToBounds="True"
                 Background="{DynamicResource SurfaceSoftBrush}">
             <Grid>
 
@@ -36,6 +39,33 @@
                      lives on a Freezable whose DataContext is populated after template
                      adoption and therefore never receives binding updates. -->
                 <ItemsControl ItemsSource="{Binding SpectrumBins}">
+                    <ItemsControl.Style>
+                        <!-- Fade the bars while detection is paused (design uses 0.4),
+                             with a short transition matching the transport button fade. -->
+                        <Style TargetType="ItemsControl">
+                            <Setter Property="Opacity" Value="1" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsDrivingDevice}" Value="False">
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                 To="0.4" Duration="0:0:0.18" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                 To="1" Duration="0:0:0.18" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.Style>
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <UniformGrid Rows="1" />
@@ -80,18 +110,19 @@
                     </Ellipse.RenderTransform>
                 </Ellipse>
 
-                <!-- Detection-paused badge: overlaid at the bottom of the visualizer.
-                     Shown when IsPlaying=false and there IS audio (idle overlay handles
-                     the no-audio case and covers this badge anyway). -->
-                <Border HorizontalAlignment="Center" VerticalAlignment="Bottom"
-                        Margin="0,0,0,8"
+                <!-- Detection-paused badge: overlaid at the top-right of the visualizer
+                     (matching the design's top:12 / right:14). Shown when device
+                     driving is off and there IS audio (idle overlay handles the
+                     no-audio case anyway). -->
+                <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="0,12,14,0"
                         Background="{DynamicResource SurfaceSoftBrush}"
                         BorderBrush="{DynamicResource AppBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="10"
                         Padding="10,4"
                         IsHitTestVisible="False"
-                        Visibility="{Binding IsPlaying,
+                        Visibility="{Binding IsDrivingDevice,
                                      Converter={StaticResource BoolToVis},
                                      ConverterParameter=Invert}">
                     <StackPanel Orientation="Horizontal">
@@ -111,111 +142,145 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Idle overlay: shown when there is no audio signal (HasAudio=false).
-                     Covers the bars, beat ring, and pause badge to prompt the user. -->
-                <Grid Visibility="{Binding HasAudio,
-                                   Converter={StaticResource BoolToVis},
-                                   ConverterParameter=Invert}"
-                      Background="{DynamicResource SurfaceSoftBrush}">
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <!-- Concentric rings communicate the "listening" / idle state. -->
-                        <Grid Width="54" Height="54" HorizontalAlignment="Center">
-                            <Ellipse Width="54" Height="54" Fill="Transparent"
-                                     Stroke="{DynamicResource AppBorderBrush}" StrokeThickness="1"
-                                     Opacity="0.4" />
-                            <Ellipse Width="36" Height="36" Fill="Transparent"
-                                     Stroke="{DynamicResource AppBorderBrush}" StrokeThickness="1"
-                                     Opacity="0.55" />
-                            <Ellipse Width="18" Height="18" Fill="Transparent"
-                                     Stroke="{DynamicResource AppBorderBrush}" StrokeThickness="1"
-                                     Opacity="0.7" />
-                        </Grid>
-                        <TextBlock Text="Play some music to get started"
-                                   FontSize="12" Foreground="{DynamicResource TextDimBrush}"
-                                   HorizontalAlignment="Center" Margin="0,10,0,0" />
-                    </StackPanel>
+                <!-- Idle prompt: a centered label shown only while device driving is
+                     enabled with no audio detected. Gated via a MultiDataTrigger
+                     (HasAudio=False AND IsDrivingDevice=True) because Visibility depends
+                     on two bound conditions. When off, the centered transport button
+                     occupies this space. -->
+                <Grid Background="{DynamicResource SurfaceSoftBrush}">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding HasAudio}" Value="False" />
+                                        <Condition Binding="{Binding IsDrivingDevice}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <TextBlock Text="Play some music to get started"
+                               FontSize="12" Foreground="{DynamicResource TextDimBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Grid>
+
+                <!-- Centered transport button — overlaid on top of everything.
+                     Paused: solid gold play button, always visible (reads as "resume").
+                     Playing: rose pause button, hidden until the visualizer is hovered.
+                     Last child in the Grid so it renders above the bars/idle overlay. -->
+                <Button x:Name="TransportButton"
+                        Width="60" Height="60"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Command="{Binding ToggleDrivingDeviceCommand}"
+                        Cursor="Hand">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <!-- Shown state is the default; the trigger below hides it
+                                 only while playing AND the visualizer is not hovered. -->
+                            <Setter Property="Opacity" Value="1" />
+                            <Setter Property="IsHitTestVisible" Value="True" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsDrivingDevice}" Value="True" />
+                                        <Condition Binding="{Binding IsMouseOver, ElementName=Visualizer}" Value="False" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="IsHitTestVisible" Value="False" />
+                                    <!-- Fade matches the design's 180 ms opacity transition. -->
+                                    <MultiDataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                 To="0" Duration="0:0:0.18" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </MultiDataTrigger.EnterActions>
+                                    <MultiDataTrigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                 To="1" Duration="0:0:0.18" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </MultiDataTrigger.ExitActions>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <!-- Shadow layer: empty sibling so the drop shadow never
+                                 rasterizes the icon (per the two-layer shadow rule). -->
+                            <Grid>
+                                <Border CornerRadius="30"
+                                        Background="{DynamicResource RoseBrush}">
+                                    <Border.Effect>
+                                        <DropShadowEffect ShadowDepth="3" BlurRadius="20"
+                                                          Color="#C4768A" Opacity="0.45" />
+                                    </Border.Effect>
+                                </Border>
+                                <Border x:Name="Bg"
+                                        CornerRadius="30"
+                                        Background="{DynamicResource RoseBrush}"
+                                        SnapsToDevicePixels="True">
+                                    <Grid Width="60" Height="60">
+                                        <!-- Pause icon: shown while playing -->
+                                        <StackPanel x:Name="PauseIcon"
+                                                    Orientation="Horizontal"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center">
+                                            <Rectangle Width="4.5" Height="18"
+                                                       Fill="White"
+                                                       RadiusX="2" RadiusY="2" />
+                                            <Rectangle Width="4.5" Height="18"
+                                                       Fill="White"
+                                                       RadiusX="2" RadiusY="2"
+                                                       Margin="5,0,0,0" />
+                                        </StackPanel>
+                                        <!-- Play icon: shown while paused -->
+                                        <Path x:Name="PlayIcon"
+                                              Data="M 0,0 L 19,11.5 L 0,23 Z"
+                                              Fill="White"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="3,0,0,0"
+                                              Visibility="Collapsed" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <!-- Paused state: gold background + play icon -->
+                                <DataTrigger Binding="{Binding IsDrivingDevice}" Value="False">
+                                    <Setter TargetName="Bg"        Property="Background"
+                                            Value="{DynamicResource GoldBrush}" />
+                                    <Setter TargetName="PauseIcon" Property="Visibility"
+                                            Value="Collapsed" />
+                                    <Setter TargetName="PlayIcon"  Property="Visibility"
+                                            Value="Visible" />
+                                </DataTrigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bg" Property="Opacity" Value="0.88" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Bg" Property="Opacity" Value="0.74" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
 
             </Grid>
         </Border>
 
-        <!-- ========== PLAY / PAUSE  +  LIVE STATS BAR ========== -->
+        <!-- ========== LIVE STATS BAR ========== -->
+        <!-- Spans the full container width directly below the visualizer.
+             Device and Speed columns show "—" in Phase 2; they will be
+             populated when the device-driving path is wired in Phase 3. -->
         <Grid Margin="0,14,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="40" />   <!-- Play/pause button -->
-                <ColumnDefinition Width="12" />   <!-- Gap -->
-                <ColumnDefinition Width="*"  />   <!-- Stats bar -->
-            </Grid.ColumnDefinitions>
-
-            <!-- Play / pause button — circular, 40×40.
-                 Shows a pause icon (two bars, white on rose) when playing, and a
-                 play icon (triangle, rose on soft-rose) when paused.
-                 DataTriggers swap both the icon visibility and the background. -->
-            <Button Grid.Column="0"
-                    Width="40" Height="40"
-                    Command="{Binding TogglePlayingCommand}"
-                    Cursor="Hand">
-                <Button.Template>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bg"
-                                CornerRadius="20"
-                                Background="{DynamicResource RoseBrush}"
-                                BorderThickness="0"
-                                SnapsToDevicePixels="True">
-                            <Grid Width="40" Height="40">
-                                <!-- Pause icon: shown while playing -->
-                                <StackPanel x:Name="PauseIcon"
-                                            Orientation="Horizontal"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center">
-                                    <Rectangle Width="3.5" Height="12"
-                                               Fill="White"
-                                               RadiusX="1.5" RadiusY="1.5" />
-                                    <Rectangle Width="3.5" Height="12"
-                                               Fill="White"
-                                               RadiusX="1.5" RadiusY="1.5"
-                                               Margin="4,0,0,0" />
-                                </StackPanel>
-                                <!-- Play icon: shown while paused -->
-                                <Path x:Name="PlayIcon"
-                                      Data="M 2,0 L 13,6.5 L 2,13 Z"
-                                      Fill="{DynamicResource RoseBrush}"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"
-                                      Margin="2,0,0,0"
-                                      Visibility="Collapsed" />
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <!-- Paused state: soft background + rose play icon -->
-                            <DataTrigger Binding="{Binding IsPlaying}" Value="False">
-                                <Setter TargetName="Bg"       Property="Background"
-                                        Value="{DynamicResource RoseSoftBrush}" />
-                                <Setter TargetName="Bg"       Property="BorderBrush"
-                                        Value="{DynamicResource RoseBrush}" />
-                                <Setter TargetName="Bg"       Property="BorderThickness"
-                                        Value="1.5" />
-                                <Setter TargetName="PauseIcon" Property="Visibility"
-                                        Value="Collapsed" />
-                                <Setter TargetName="PlayIcon"  Property="Visibility"
-                                        Value="Visible" />
-                            </DataTrigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bg" Property="Opacity" Value="0.82" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bg" Property="Opacity" Value="0.68" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Button.Template>
-            </Button>
-
-            <!-- Live stats bar: three equal-width stats side by side.
-                 Device and Speed columns show "—" in Phase 2; they will be
-                 populated when the device-driving path is wired in Phase 3. -->
-            <Border Grid.Column="2"
-                    CornerRadius="8"
+            <Border CornerRadius="8"
                     Background="{DynamicResource SurfaceSoftBrush}"
                     BorderBrush="{DynamicResource AppBorderBrush}"
                     BorderThickness="1"
@@ -231,17 +296,19 @@
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
                                     Margin="0,3,0,0">
-                            <!-- Live: show the BPM integer -->
+                            <!-- Music BPM tracks detection, which runs continuously —
+                                 show it whenever audio is present, independent of play
+                                 state. Play only gates driving the device (Device/Speed). -->
                             <TextBlock Text="{Binding LiveBpm}"
                                        FontSize="17" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextBrush}"
-                                       Visibility="{Binding HasLiveStats,
+                                       Visibility="{Binding HasAudio,
                                                     Converter={StaticResource BoolToVis}}" />
-                            <!-- Not live: show a dash -->
+                            <!-- No audio: show a dash -->
                             <TextBlock Text="—"
                                        FontSize="17" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextDimBrush}"
-                                       Visibility="{Binding HasLiveStats,
+                                       Visibility="{Binding HasAudio,
                                                     Converter={StaticResource BoolToVis},
                                                     ConverterParameter=Invert}" />
                             <TextBlock Text=" bpm"

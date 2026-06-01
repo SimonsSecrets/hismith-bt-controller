@@ -122,6 +122,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         ManualModeViewModel.ForceStop();
+        _soundModeViewModel.ForceStop();
 
         IsStopFlashing = true;
         _stopFlashTimer?.Stop();

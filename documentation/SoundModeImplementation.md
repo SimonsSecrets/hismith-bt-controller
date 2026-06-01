@@ -356,8 +356,10 @@ These guards exist because of concrete bugs:
 - `BeatTick` / `BeatPulse` drive the live dot + ring animation. They are paced by a
   `DispatcherTimer` whose interval is the beat period (`60000/LiveBpm` ms), **not** by the
   discrete onsets — so the visual pulse matches the displayed BPM instead of the (denser,
-  jittery) raw onset rate. The timer runs only while `HasLiveStats` (playing + audio) and
-  `LiveBpm > 0`, and restarts only when `LiveBpm` actually changes to avoid resetting its phase.
+  jittery) raw onset rate. The timer runs only while `IsActivelyDriving` (device driving
+  enabled + audio) and `LiveBpm > 0`, and restarts only when `LiveBpm` actually changes to
+  avoid resetting its phase. Note: `IsDrivingDevice` gates *driving the device*, not detection
+  — the Music BPM readout updates whenever `HasAudio`, independent of the play/pause toggle.
 - All audio-thread callbacks marshal to the dispatcher before touching observable state.
 
 ---

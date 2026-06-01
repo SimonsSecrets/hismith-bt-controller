@@ -53,9 +53,9 @@ Implement `MockAudioCaptureService` to generate a 120 BPM kick-style pulse + pin
 - Create `src/HismithController/UI/ViewModels/SoundModeViewModel.cs` modeled after [ManualModeViewModel.cs](src/HismithController/UI/ViewModels/ManualModeViewModel.cs).
 - Properties for this phase:
   - `HasAudio` (bool) — true when capture state is `Running` and not in `NoSignal`.
-  - `IsPlaying` (bool) — user-toggled; **defaults to `false` (paused) every time the tab is activated.** The user must explicitly press Play to start beat-driven device commands. This avoids startling the user with sudden device activity the moment they switch to Sound Mode. (No device commands wired in this phase yet, but the bool already gates everything that will be wired in Phase 3.)
+  - `IsDrivingDevice` (bool) — user-toggled; **defaults to `false` (paused) every time the tab is activated.** The user must explicitly press Play to start beat-driven device commands. This avoids startling the user with sudden device activity the moment they switch to Sound Mode. (No device commands wired in this phase yet, but the bool already gates everything that will be wired in Phase 3.)
   - `SpectrumBins` (ObservableCollection<double> or float[]) — bound to the visualizer.
-- `InitializeAsync()` starts the capture service and sets `IsPlaying = false`; `Dispose`/`Deactivate` stops it.
+- `InitializeAsync()` starts the capture service and sets `IsDrivingDevice = false`; `Dispose`/`Deactivate` stops it.
 - Marshal incoming events onto the UI dispatcher.
 
 ### 1.5 `SoundModeView.xaml` — visualizer-only first cut ✅
@@ -124,12 +124,12 @@ Approach: **beat-count window, not time window, plus explicit change detection.*
 - New properties:
   - `LiveBpm` (int) — the music BPM displayed in the "Music" stat.
   - `BeatTick` (bool) — flips briefly true on each beat so the UI can flash. Use a `DispatcherTimer` of ~120 ms to reset it.
-- The `IsPlaying = false` (paused) state gates the `BeatTick` flashes but **does not stop** the capture or detector — the visualizer keeps moving (per design §6.6).
+- The `IsDrivingDevice = false` (paused) state gates the `BeatTick` flashes but **does not stop** the capture or detector — the visualizer keeps moving (per design §6.6).
 
 ### 2.5 Extend `SoundModeView.xaml` ✅
 - Add the **beat ring overlay** (`viz-beat-ring` in the design): a centered ring that scales/opacity-pulses when `BeatTick` flips. Use a `Storyboard` triggered by a `DataTrigger` on `BeatTick`, or a behavior that animates on each event.
 - Add the **Live stats bar** stub with just the "Music" stat populated (Device/Speed columns can show `—` for now).
-- Add the Play/Pause button bound to `IsPlaying` (no device wiring yet — just the bool and the visual "Detection paused" badge).
+- Add the Play/Pause button bound to `IsDrivingDevice` (no device wiring yet — just the bool and the visual "Detection paused" badge).
 
 ### 2.6 Verify Phase 2
 - Play tracks with known tempos (e.g. a 120 BPM electronic track, a 90 BPM hip-hop track). The displayed BPM should settle within ~3–5 seconds and stay within ±2 BPM of truth.
@@ -155,27 +155,27 @@ Approach: **beat-count window, not time window, plus explicit change detection.*
 
 ### 3.2 Wire `SoundModeViewModel` to `IConnectedDeviceService`
 - Inject `IConnectedDeviceService` into `SoundModeViewModel`.
-- When `IsPlaying` is true and `HasAudio` is true, push the mapper's output to `device.SetTargetBpmAsync(...)`.
-- When `IsPlaying` flips to false: immediately send `SetTargetBpmAsync(0)`. The visualizer + detector keep running.
-- **Tab activation:** `IsPlaying` is forced to `false` every time the user switches **to** the Sound tab (see §1.4 — `InitializeAsync` already sets this). The user must explicitly press Play; no device commands fire until they do. This is a safety/comfort decision, not just an open-question resolution.
+- When `IsDrivingDevice` is true and `HasAudio` is true, push the mapper's output to `device.SetTargetBpmAsync(...)`.
+- When `IsDrivingDevice` flips to false: immediately send `SetTargetBpmAsync(0)`. The visualizer + detector keep running.
+- **Tab activation:** `IsDrivingDevice` is forced to `false` every time the user switches **to** the Sound tab (see §1.4 — `InitializeAsync` already sets this). The user must explicitly press Play; no device commands fire until they do. This is a safety/comfort decision, not just an open-question resolution.
 - **Tab deactivation:** when the user switches **away from** the Sound tab, Sound Mode must release the device:
-  - Flip `IsPlaying = false` (this triggers the immediate `SetTargetBpmAsync(0)` above).
+  - Flip `IsDrivingDevice = false` (this triggers the immediate `SetTargetBpmAsync(0)` above).
   - Stop the audio capture service entirely — no point burning CPU on FFTs the user can't see.
   - Hook this off `MainViewModel.ActiveMode` changing away from `"Sound"`. The cleanest seam is to give `SoundModeViewModel` a `Deactivate()` method and call it from `MainViewModel.OnActiveModeChanged` when transitioning out of Sound (mirroring how `InitializeAsync` is called when transitioning in).
-- Listen to global stop (existing `EmergencyStopAsync` in MainViewModel): when invoked, the device is already stopped, but also flip `IsPlaying = false` so we don't immediately re-send a non-zero BPM on the next beat. The user has to press Play again to resume — same comfort principle as tab activation.
+- Listen to global stop (existing `EmergencyStopAsync` in MainViewModel): when invoked, the device is already stopped, but also flip `IsDrivingDevice = false` so we don't immediately re-send a non-zero BPM on the next beat. The user has to press Play again to resume — same comfort principle as tab activation.
 
 ### 3.3 Populate the Device / Speed stats
 - Bind the "Device" stat to `deviceBpm` and the "Speed" stat to `device.BpmToPercent(deviceBpm)`.
-- Show `—` / `0` when `!IsPlaying || !HasAudio`.
+- Show `—` / `0` when `!IsDrivingDevice || !HasAudio`.
 
 ### 3.4 Reconnect / connection-lost handling
-- Reuse the same patterns as Manual mode (`OnBleStatusChanged` → `ChipState.Lost`). When the device disconnects mid-playback, flip `IsPlaying = false` and surface the existing "Connection lost" banner.
+- Reuse the same patterns as Manual mode (`OnBleStatusChanged` → `ChipState.Lost`). When the device disconnects mid-playback, flip `IsDrivingDevice = false` and surface the existing "Connection lost" banner.
 
 ### 3.5 Verify Phase 3
 - With a real Hismith connected (or `--mock` for log inspection), play a track and press Play. The device should follow the music BPM closely — track tempo changes within a couple of beats (driven by §2.3's estimator dynamics, not by any mapper-side ramp).
 - **Tab activation behaviour:** switch to the Sound tab while audio is already playing. The visualizer should react immediately, but the device must stay at 0 — no commands fire until Play is pressed.
 - Press Pause — the device should stop within ~50 ms.
-- Press the global Stop button while playing — the device stops, `IsPlaying` becomes false, the music keeps playing but the device stays at 0. Pressing Play again resumes.
+- Press the global Stop button while playing — the device stops, `IsDrivingDevice` becomes false, the music keeps playing but the device stays at 0. Pressing Play again resumes.
 - **Tab deactivation behaviour:** switch to Manual mid-playback. The device should stop immediately, and the Sound capture service should stop (no continued CPU use on FFTs). Switching back to Sound returns to the paused state.
 - **Stress test with large legitimate jumps** (metronome 60 → 180 BPM, or a track with a hard tempo cut). Observe and listen to the device: does the motor handle the immediate jump cleanly, or does it strain / make ugly noises? If the latter, add the safety governor mentioned in §3.1 (coarse slew limit) — otherwise leave the direct-apply path as-is.
 
