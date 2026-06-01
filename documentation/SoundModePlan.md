@@ -196,7 +196,7 @@ Approach: **beat-count window, not time window, plus explicit change detection.*
   - The active tile gets the accent background; others are subtle outlines.
 - Apply the ratio in `BeatToDeviceMapper`: `deviceBpm = musicBpm / ratio` **before** the cap is applied.
 
-### 4.2 Max device speed cap
+### 4.2 Max device speed cap ✅
 - `SoundModeViewModel` properties:
   - `MaxBpm` (int, default 240 — uncapped).
   - `MaxBpmPercent` (computed, for display).

@@ -366,14 +366,19 @@ These guards exist because of concrete bugs:
 
 - **`ThrustRhythm`** (`Features/SoundMode/ThrustRhythm.cs`) — `EveryBeat`/`EveryTwoBeats`/`EveryFourBeats`.
   The enum's integer value **is** the divider ratio, so it casts straight to `int`.
-- **`BeatToDeviceMapper.Map(musicBpm, rhythm)`** (`Features/SoundMode/BeatToDeviceMapper.cs`) —
-  pure, stateless: `deviceBpm = round(musicBpm / ratio)`. No `IDevice` dependency, no ramp, no cap.
-  The §4.2 max-speed cap slots in here later as `Math.Min(.., maxBpm)`.
+- **`BeatToDeviceMapper.Map(musicBpm, rhythm, maxBpm)`** (`Features/SoundMode/BeatToDeviceMapper.cs`) —
+  pure, stateless: `deviceBpm = round(min(musicBpm / ratio, maxBpm))`. The cap operates on the
+  **unrounded post-ratio** value (design §6.4), then rounds. No `IDevice` dependency, no ramp.
 - `SoundModeViewModel` exposes the read-only `RhythmOptions` tiles (each a `ThrustRhythmOption`
   with an `IsSelected` flag tracked exactly like `PresetItem.IsActive`), the `SelectedRhythm`
-  enum, and the computed display stats `DeviceBpm` / `DeviceSpeedPercent` / `IsRatioBadgeVisible` /
-  `RatioBadgeText`. `DeviceSpeedPercent` uses the design's fixed **240 BPM** full-scale, not
-  `IDevice.BpmToPercent` — the device dependency belongs to Phase 3.
+  enum, the `MaxBpm` cap (default **240 = uncapped**), and the computed display stats
+  `DeviceBpm` / `DeviceSpeedPercent` / `IsRatioBadgeVisible` / `RatioBadgeText` /
+  `MaxBpmPercent` / `IsCapped` / `IsCapActive`. `DeviceSpeedPercent` and `MaxBpmPercent` use the
+  fixed **240 BPM** full-scale, not `IDevice.BpmToPercent` — the device dependency belongs to Phase 3.
+- **Cap UI (§4.2):** a 0–240 slider bound to `MaxBpm`, a `"{MaxBpm} BPM · {MaxBpmPercent}%"` readout,
+  and a "Capped" pill shown whenever `IsCapped` (cap set below full scale). `IsCapActive`
+  (driving + capped + post-ratio tempo has reached the ceiling) drives a second gold "Capped"
+  badge next to the Device stat. **`MaxBpm` is not yet persisted** — that is §4.3.
 - **The mapping is display-only right now.** Phase 3 (sending `deviceBpm` to the BLE device) and
   §4.2/§4.3 (max-speed cap + persistence) are **not** implemented. `DeviceBpm`/`DeviceSpeedPercent`
   return **0 unless `IsActivelyDriving`** (audio present **and** Play engaged), matching the design's

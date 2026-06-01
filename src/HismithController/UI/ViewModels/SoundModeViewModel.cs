@@ -51,6 +51,7 @@ public partial class SoundModeViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsActivelyDriving))]
     [NotifyPropertyChangedFor(nameof(DeviceBpm))]
     [NotifyPropertyChangedFor(nameof(DeviceSpeedPercent))]
+    [NotifyPropertyChangedFor(nameof(IsCapActive))]
     private bool _hasAudio;
 
     // User-controlled gate for sending detected beats to the device. Reset to
@@ -61,6 +62,7 @@ public partial class SoundModeViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsActivelyDriving))]
     [NotifyPropertyChangedFor(nameof(DeviceBpm))]
     [NotifyPropertyChangedFor(nameof(DeviceSpeedPercent))]
+    [NotifyPropertyChangedFor(nameof(IsCapActive))]
     private bool _isDrivingDevice;
 
     // Current music BPM from the beat detector; updated on every detected beat
@@ -68,6 +70,7 @@ public partial class SoundModeViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DeviceBpm))]
     [NotifyPropertyChangedFor(nameof(DeviceSpeedPercent))]
+    [NotifyPropertyChangedFor(nameof(IsCapActive))]
     private int _liveBpm;
 
     // Thrust rhythm: how many detected beats make up one device stroke. Divides the
@@ -77,6 +80,7 @@ public partial class SoundModeViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(DeviceSpeedPercent))]
     [NotifyPropertyChangedFor(nameof(IsRatioBadgeVisible))]
     [NotifyPropertyChangedFor(nameof(RatioBadgeText))]
+    [NotifyPropertyChangedFor(nameof(IsCapActive))]
     private ThrustRhythm _selectedRhythm = ThrustRhythm.EveryBeat;
 
     // Flips true on each beat while actively driving; reset to false after ~120 ms
@@ -90,15 +94,41 @@ public partial class SoundModeViewModel : ObservableObject
     // (Device/Speed) and the BPM-paced beat pulse.
     public bool IsActivelyDriving => HasAudio && IsDrivingDevice;
 
-    // Device BPM the rhythm divider would apply to the device (Phase 3 not wired yet,
-    // so this only feeds the stats display). 0 unless actively driving — matches the
-    // design, where the device columns read 0 while paused / silent.
-    public int DeviceBpm => IsActivelyDriving ? BeatToDeviceMapper.Map(LiveBpm, SelectedRhythm) : 0;
+    // Full-scale BPM reference. The design slider runs 0–240 and treats 240 as
+    // "uncapped"; speed percentages are expressed against this same scale.
+    private const int FullScaleBpm = 240;
 
-    // Device speed as a percentage of the design's fixed 240 BPM full-scale. Uses the
-    // same 240 reference as modes.jsx rather than IDevice.BpmToPercent — the device
-    // dependency belongs to Phase 3.
-    public int DeviceSpeedPercent => IsActivelyDriving ? (int)Math.Round(DeviceBpm / 240.0 * 100) : 0;
+    // Device BPM the mapper would apply: music BPM ÷ rhythm ratio, capped at MaxBpm
+    // (Phase 3 not wired yet, so this only feeds the stats display). 0 unless actively
+    // driving — matches the design, where the device columns read 0 while paused/silent.
+    public int DeviceBpm => IsActivelyDriving ? BeatToDeviceMapper.Map(LiveBpm, SelectedRhythm, MaxBpm) : 0;
+
+    // Device speed as a percentage of the fixed 240 BPM full-scale. Uses the same 240
+    // reference as modes.jsx rather than IDevice.BpmToPercent — the device dependency
+    // belongs to Phase 3.
+    public int DeviceSpeedPercent => IsActivelyDriving ? (int)Math.Round(DeviceBpm / (double)FullScaleBpm * 100) : 0;
+
+    // User-set ceiling on the device BPM (post-ratio). 240 = uncapped (slider maximum).
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DeviceBpm))]
+    [NotifyPropertyChangedFor(nameof(DeviceSpeedPercent))]
+    [NotifyPropertyChangedFor(nameof(MaxBpmPercent))]
+    [NotifyPropertyChangedFor(nameof(IsCapped))]
+    [NotifyPropertyChangedFor(nameof(IsCapActive))]
+    private int _maxBpm = FullScaleBpm;
+
+    // The cap value as a percentage of full scale, for the readout next to the slider.
+    public int MaxBpmPercent => (int)Math.Round(MaxBpm / (double)FullScaleBpm * 100);
+
+    // A cap is in effect (below full scale) → drives the "Capped" pill in the slider header.
+    public bool IsCapped => MaxBpm < FullScaleBpm;
+
+    // The cap is actually limiting the output right now: capped, driving, and the
+    // post-ratio music tempo has reached the ceiling (design's `postRatio >= maxBpm - 0.5`).
+    // Drives the gold "Capped" badge on the Device stat.
+    public bool IsCapActive =>
+        IsActivelyDriving && IsCapped &&
+        LiveBpm / (double)(int)SelectedRhythm >= MaxBpm - 0.5;
 
     // The "÷N" rhythm badge (shown centered between the Music and Device stats) is
     // visible whenever a non-1 rhythm is selected — independent of the driving state,

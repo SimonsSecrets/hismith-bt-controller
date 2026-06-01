@@ -340,6 +340,19 @@
                                        Foreground="{DynamicResource TextDimBrush}"
                                        VerticalAlignment="Bottom"
                                        Margin="1,0,0,2" />
+                            <!-- Gold "Capped" badge: shown only when the cap is actively
+                                 limiting the post-ratio output (design's gold capActive pill). -->
+                            <Border Background="{DynamicResource GoldTintBrush}"
+                                    CornerRadius="8"
+                                    Padding="6,1"
+                                    VerticalAlignment="Center"
+                                    Margin="6,0,0,0"
+                                    Visibility="{Binding IsCapActive,
+                                                 Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Capped"
+                                           FontSize="10" FontWeight="SemiBold"
+                                           Foreground="#8B6630" />
+                            </Border>
                         </StackPanel>
                     </StackPanel>
 
@@ -474,6 +487,59 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <!-- ========== MAX DEVICE SPEED ========== -->
+        <!-- Header row: title (left) + "{MaxBpm} BPM · {MaxBpmPercent}%" readout and a
+             "Capped" pill (right) shown whenever a cap is set (MaxBpm < 240). -->
+        <Grid Margin="0,20,0,10">
+            <TextBlock Text="Max device speed"
+                       FontSize="12" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextBrush}"
+                       HorizontalAlignment="Left" VerticalAlignment="Center" />
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right" VerticalAlignment="Center">
+                <TextBlock FontSize="13" FontWeight="Medium"
+                           Foreground="{DynamicResource TextBrush}"
+                           VerticalAlignment="Center">
+                    <Run Text="{Binding MaxBpm}" /><Run Text=" BPM · " /><Run Text="{Binding MaxBpmPercent}" /><Run Text="%" />
+                </TextBlock>
+                <Border Background="{DynamicResource GoldTintBrush}"
+                        CornerRadius="8"
+                        Padding="6,1"
+                        VerticalAlignment="Center"
+                        Margin="8,0,0,0"
+                        Visibility="{Binding IsCapped,
+                                     Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="Capped"
+                               FontSize="10" FontWeight="SemiBold"
+                               Foreground="#8B6630" />
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <Slider Minimum="0" Maximum="240"
+                Value="{Binding MaxBpm, Mode=TwoWay}"
+                Style="{StaticResource ManualSpeedSlider}"
+                IsMoveToPointEnabled="True"
+                Height="28" />
+
+        <!-- Footer scale labels (design: 0 · 120 · 240 (uncapped)). -->
+        <Grid Margin="0,6,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="0"
+                       FontSize="11" Foreground="{DynamicResource TextDimBrush}"
+                       HorizontalAlignment="Left" />
+            <TextBlock Grid.Column="1" Text="120"
+                       FontSize="11" Foreground="{DynamicResource TextDimBrush}"
+                       HorizontalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="240 (uncapped)"
+                       FontSize="11" Foreground="{DynamicResource TextDimBrush}"
+                       HorizontalAlignment="Right" />
+        </Grid>
 
     </StackPanel>
 </UserControl>
