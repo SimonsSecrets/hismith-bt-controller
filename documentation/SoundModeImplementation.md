@@ -77,7 +77,7 @@ Plain-language definitions of the audio/DSP terms used throughout this document.
 ```
 WASAPI loopback ─► AudioFrame (mono, 44.1 kHz) ─► SpectralFluxBeatDetector ─► SoundModeViewModel ─► UI / device
                                                    │
-                                                   ├─ per hop (audio thread):  spectral flux ─► onset peak-pick ─► BeatDetected (pulse/liveness)
+                                                   ├─ per hop (audio thread):  spectral flux ─► onset peak-pick ─► BeatDetected (liveness)
                                                    │                                          └─► append to OSF ring
                                                    └─ every 500 ms (timer thread): autocorrelation over OSF ─► CurrentBpm / Confidence
 ```
@@ -86,7 +86,7 @@ Two outputs come out of the detector and they are deliberately **decoupled**:
 
 | Output | Source | Used for |
 |---|---|---|
-| `BeatDetected` events | discrete spectral-flux onsets | the visual beat pulse + "audio is live" signal |
+| `BeatDetected` events | discrete spectral-flux onsets | the "audio is live" signal (`HasAudio`) |
 | `CurrentBpm` / `Confidence` | autocorrelation of the onset-strength envelope | the displayed tempo + device speed |
 
 The single most important design decision is that **the BPM number is not computed
@@ -300,7 +300,11 @@ These guards exist because of concrete bugs:
 - `HasAudio` is held true for `AudioHoldMs = 4000 ms` after each beat to bridge sparse/slow
   sources, then falls back to the live capture state. This is why stopping audio takes a
   few seconds to surface the idle overlay.
-- `BeatTick` / `BeatPulse` drive the ring animation off the discrete onsets (cosmetic).
+- `BeatTick` / `BeatPulse` drive the live dot + ring animation. They are paced by a
+  `DispatcherTimer` whose interval is the beat period (`60000/LiveBpm` ms), **not** by the
+  discrete onsets — so the visual pulse matches the displayed BPM instead of the (denser,
+  jittery) raw onset rate. The timer runs only while `HasLiveStats` (playing + audio) and
+  `LiveBpm > 0`, and restarts only when `LiveBpm` actually changes to avoid resetting its phase.
 - All audio-thread callbacks marshal to the dispatcher before touching observable state.
 
 ---

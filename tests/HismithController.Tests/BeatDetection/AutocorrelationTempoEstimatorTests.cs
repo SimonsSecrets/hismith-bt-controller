@@ -79,6 +79,43 @@ public class AutocorrelationTempoEstimatorTests
         Assert.InRange(result.Bpm, 196, 204);
     }
 
+    // Build a 100 BPM train with an accented downbeat every `accentEvery` beats:
+    // the accented onset is full magnitude, the others are quieter. The accent injects
+    // a strong subharmonic period (100/accentEvery BPM) into the autocorrelation, the
+    // pattern that made the old global-max picker flap between 100 and its divisors.
+    private static double[] AccentedTrain(double beatBpm, int accentEvery, double weakMag)
+    {
+        var osf = new double[OsfLen];
+        double pulseSamples = (60_000.0 / beatBpm) / HopMs;
+        ReadOnlySpan<double> kernel = stackalloc double[] { 0.5, 1.0, 0.5 };
+        for (int k = 0; ; k++)
+        {
+            int center = (int)Math.Round(k * pulseSamples);
+            if (center - 1 >= OsfLen) break;
+            double mag = (k % accentEvery == 0) ? 1.0 : weakMag;
+            for (int j = 0; j < kernel.Length; j++)
+            {
+                int idx = center - 1 + j;
+                if (idx >= 0 && idx < OsfLen) osf[idx] = Math.Max(osf[idx], mag * kernel[j]);
+            }
+        }
+        return osf;
+    }
+
+    [Theory]
+    [InlineData(2, 0.3)]   // accent every 2 beats → strong 50 BPM subharmonic
+    [InlineData(4, 0.15)]  // accent every 4 beats → strong 25 BPM subharmonic
+    public void Analyze_AccentedMetronome_ReportsBeatNotSubharmonic(int accentEvery, double weakMag)
+    {
+        // A metronome whose accented/unaccented clicks differ in kick/bass-band energy
+        // makes the half/quarter-tempo autocorrelation peak win, so a plain global-max
+        // pick flapped to 50/25. Subharmonic rejection must lock to the click rate (100),
+        // the regime the unfolded metronome path relies on.
+        var est = Default();
+        var result = est.Analyze(AccentedTrain(100, accentEvery, weakMag), HopMs, fold: false);
+        Assert.InRange(result.Bpm, 97, 103);
+    }
+
     [Fact]
     public void Analyze_EmptyEnvelope_ReturnsZero()
     {

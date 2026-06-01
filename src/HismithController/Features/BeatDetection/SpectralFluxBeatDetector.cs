@@ -342,7 +342,9 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
         else if (sparsity >= _sparsityMetronomeMin)
             _foldDense = false;
 
-        var est = _tempoEstimator.Analyze(snapshot, HopMs, fold: _foldDense);
+        // TEMPORARY (diagnostic): octave folding forced off to verify the BPM-jump bug
+        // lives in the sparsity classifier / fold path. Revert once confirmed.
+        var est = _tempoEstimator.Analyze(snapshot, HopMs, fold: false);
         _autoBpm  = est.Bpm;
         _autoConf = est.Confidence;
     }

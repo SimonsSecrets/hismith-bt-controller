@@ -21,6 +21,23 @@ public sealed class AutocorrelationTempoEstimator
 {
     public readonly record struct TempoEstimate(int Bpm, float Confidence);
 
+    // Subharmonic rejection: when promoting the global-max lag down to a divisor
+    // (½, ⅓, ¼ tempo → the true period), that divisor lag must itself be a local
+    // maximum standing at least this fraction of the global-max strength. A strong
+    // accent can pull the fundamental peak well below the sub-tempo peak, so the bar
+    // is deliberately low; it stays safe because only the exact divisor lags are
+    // tested (not every short lag), and on a clean train those land on troughs.
+    private const double SubharmonicPeakFraction = 0.30;
+
+    // Largest integer subdivision considered when undoing a sub-tempo pick: a global
+    // peak up to 4× the true period (e.g. a 25 BPM read of a 100 BPM click) is folded
+    // back up. Beyond ¼ the divisor lags get too close to the noise floor to trust.
+    private const int MaxSubharmonicFactor = 4;
+
+    // Half-width (in lag samples) of the neighbourhood searched around L/factor, to
+    // absorb the integer rounding of the division and any sub-sample offset of the peak.
+    private const int SubharmonicSearchRadius = 3;
+
     private readonly double _minBpm;
     private readonly double _maxBpm;
     private readonly double _preferredCenter;
@@ -103,6 +120,39 @@ public sealed class AutocorrelationTempoEstimator
 
         if (bestAc <= 0.0)
             return new TempoEstimate(0, 0f);
+
+        // Subharmonic rejection (octave-down correction). The autocorrelation of a
+        // periodic onset train peaks at the true period AND every integer multiple of
+        // it, so the global-max lag can be a *sub-tempo*: when the envelope has a strong
+        // accent pattern (e.g. a metronome whose accented and unaccented clicks differ
+        // in kick/bass-band energy, so every other click dominates) the half-tempo peak
+        // wins and the readout flaps between a tempo and its divisors (the 100→50→25
+        // jump). The true beat then sits at lag L/2, L/3 … as a clear local maximum.
+        // Promote to the shortest divisor lag (largest factor ⇒ fastest tempo) that is a
+        // local maximum above SubharmonicPeakFraction of the global peak. A clean train's
+        // divisor lags fall on troughs, so it is left untouched.
+        for (int factor = MaxSubharmonicFactor; factor >= 2; factor--)
+        {
+            // Integer rounding of L/factor can land a sample beside the true peak, so
+            // search a small neighbourhood for the strongest lag rather than testing the
+            // rounded lag alone (which would fail the local-max test on the peak's flank).
+            int center = (int)Math.Round((double)bestLag / factor);
+            if (center <= lagMin || center >= lagMax) continue;
+
+            int lo = Math.Max(lagMin + 1, center - SubharmonicSearchRadius);
+            int hi = Math.Min(lagMax - 1, center + SubharmonicSearchRadius);
+            int sub = lo;
+            for (int lag = lo + 1; lag <= hi; lag++)
+                if (ac[lag] > ac[sub]) sub = lag;
+
+            if (ac[sub] < bestAc * SubharmonicPeakFraction) continue;
+            if (ac[sub] >= ac[sub - 1] && ac[sub] > ac[sub + 1])
+            {
+                bestLag = sub;
+                bestAc  = ac[sub];
+                break;
+            }
+        }
 
         // Parabolic interpolation around the peak for sub-sample lag precision,
         // which matters at small lags where one sample is several BPM.

@@ -28,6 +28,18 @@ public partial class SoundModeViewModel : ObservableObject
     private const int AudioHoldMs = 4000;
     private readonly DispatcherTimer _audioHoldTimer;
 
+    // Drives the visual beat pulse (ring + live dot) from the detected BPM rather
+    // than from raw onset events. Onsets fire on every kick/snare transient, which
+    // diverges from the autocorrelation tempo shown in the readout; pacing the pulse
+    // off LiveBpm keeps the indicator and the number on the same source. Interval is
+    // the beat period (60000/BPM ms), recomputed whenever LiveBpm changes.
+    private readonly DispatcherTimer _pulseTimer;
+
+    // BPM the _pulseTimer interval is currently set for. Lets UpdatePulseTimer skip
+    // restarting (which would reset the pulse phase) when LiveBpm re-reports the same
+    // value, while still re-syncing on an actual tempo change.
+    private int _pulseTimerBpm;
+
     // Fired on the UI thread on each beat while IsPlaying, for the code-behind
     // to trigger imperative animations (ring scale + opacity) that cannot be
     // driven cleanly by DataTrigger alone when beats arrive rapidly.
@@ -88,6 +100,9 @@ public partial class SoundModeViewModel : ObservableObject
 
         _audioHoldTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(AudioHoldMs) };
         _audioHoldTimer.Tick += OnAudioHoldTimerTick;
+
+        _pulseTimer = new DispatcherTimer();
+        _pulseTimer.Tick += OnPulseTimerTick;
     }
 
     public async Task InitializeAsync()
@@ -122,6 +137,36 @@ public partial class SoundModeViewModel : ObservableObject
             // flashes appear after the user pauses or the tab is deactivated.
             _beatTickTimer.Stop();
             BeatTick = false;
+        }
+
+        UpdatePulseTimer();
+    }
+
+    // LiveBpm changed → re-pace the pulse so the ring/dot keep tracking the readout.
+    partial void OnLiveBpmChanged(int value) => UpdatePulseTimer();
+
+    // Audio came or went → start/stop the pulse alongside the live-stats gate.
+    partial void OnHasAudioChanged(bool value) => UpdatePulseTimer();
+
+    // (Re)starts or stops the BPM-driven pulse timer to match the current state.
+    // Pulses only while the live stats are showing (playing + audio) and a tempo is
+    // known; restarts only on an actual BPM change to avoid continually resetting the
+    // pulse phase as LiveBpm re-reports the same value every beat.
+    private void UpdatePulseTimer()
+    {
+        if (HasLiveStats && LiveBpm > 0)
+        {
+            if (_pulseTimerBpm == LiveBpm && _pulseTimer.IsEnabled) return;
+
+            _pulseTimerBpm       = LiveBpm;
+            _pulseTimer.Interval = TimeSpan.FromMilliseconds(60000.0 / LiveBpm);
+            _pulseTimer.Stop();   // restart so the new interval takes effect immediately
+            _pulseTimer.Start();
+        }
+        else
+        {
+            _pulseTimer.Stop();
+            _pulseTimerBpm = 0;
         }
     }
 
@@ -164,27 +209,33 @@ public partial class SoundModeViewModel : ObservableObject
 
             // A detected beat means music is playing even if the instant is silent
             // (sparse/slow source). Keep the overlay hidden and rearm the hold window.
+            // The visual pulse itself is NOT fired here — it is paced by _pulseTimer
+            // off LiveBpm so the ring/dot match the detected BPM rather than the (often
+            // denser and jittery) raw onset rate.
             HasAudio = true;
             _audioHoldTimer.Stop();
             _audioHoldTimer.Start();
-
-            if (!IsPlaying) return;
-
-            // BeatTick: force a false→true edge even if the previous tick never
-            // had time to reset (rapid beats just after unpausing). We stop the
-            // timer first so OnBeatTickTimerTick cannot fire between the two sets.
-            _beatTickTimer.Stop();
-            BeatTick = false;   // ensure the DataTrigger sees the rising edge
-            BeatTick = true;
-            _beatTickTimer.Start();
-
-            // Separate event for imperative animations (ring pulse) that need to
-            // restart cleanly at any beat frequency without DataTrigger cycling.
-            BeatPulse?.Invoke();
         });
     }
 
     // ── UI thread ─────────────────────────────────────────────────────────────
+
+    // Fires one visual pulse per beat period. Drives both the BeatTick DataTrigger
+    // (live dot) and the BeatPulse animation (ring) from the same BPM-paced source.
+    private void OnPulseTimerTick(object? sender, EventArgs e)
+    {
+        // BeatTick: force a false→true edge even if the previous tick never had time
+        // to reset (high BPM). Stop the reset timer first so OnBeatTickTimerTick cannot
+        // fire between the two sets.
+        _beatTickTimer.Stop();
+        BeatTick = false;   // ensure the DataTrigger sees the rising edge
+        BeatTick = true;
+        _beatTickTimer.Start();
+
+        // Separate event for the imperative ring animation that restarts cleanly
+        // at any beat frequency without DataTrigger cycling.
+        BeatPulse?.Invoke();
+    }
 
     private void OnBeatTickTimerTick(object? sender, EventArgs e)
     {

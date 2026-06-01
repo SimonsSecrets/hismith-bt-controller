@@ -49,7 +49,8 @@ Quick summary (`SpectralFluxBeatDetector.cs`):
 - **Onset detection** (audio thread): positive spectral flux `sum(max(0, |X[k]| - |X_prev[k]|))`
   over the kick/bass band (FFT 512 / hop 256), adaptive threshold `mean(last 40) * OnsetMultiplier`,
   **local-maximum peak-picking**, 200ms min inter-onset gate, gated on capture state `Running`.
-  Drives only the `BeatDetected` event (visual pulse / liveness). Must stay under 5ms/frame.
+  Drives only the `BeatDetected` event (liveness / `HasAudio`). Must stay under 5ms/frame.
+  The visual beat pulse is paced off `CurrentBpm` in the ViewModel, not off these onsets.
 - **Tempo / BPM** (500ms timer thread): **autocorrelation of the onset-strength envelope** — NOT
   derived from onset intervals (that approach clipped songs to 240 and jittered on metronomes).
   A sparsity classifier decides only whether to octave-fold (dense music) or not (sparse metronome).
