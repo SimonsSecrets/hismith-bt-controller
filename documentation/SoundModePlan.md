@@ -208,10 +208,15 @@ Approach: **beat-count window, not time window, plus explicit change detection.*
   - Footer labels `0 · 120 · 240 (uncapped)` exactly as in the design.
 - Apply in `BeatToDeviceMapper`: `deviceBpm = min(musicBpm / ratio, MaxBpm)`. The cap operates on the **post-ratio** value (design §6.4).
 
-### 4.3 Persistence
-- Persist `SelectedRhythm` and `MaxBpm` between sessions via `AppSettings.json` (mirror the existing pattern in `Configuration/AppSettings.cs`).
+### 4.3 Persistence ✅
+- Persist `SelectedRhythm` and `MaxBpm` between sessions. Implemented as a separate
+  `UserPreferences` POCO + `UserPreferencesStore` writing `user-settings.json` to
+  `%LOCALAPPDATA%\HismithController\` (the per-user data root, same as logs) — **not**
+  `AppConfig.json`, which is the read-only bundled deploy config in the build output.
+  Writes are debounced (~400 ms) to avoid disk thrash during slider drags, and flushed on
+  tab deactivation + app exit.
 
-### 4.4 Verify Phase 4
+### 4.4 Verify Phase 4 ✅
 - 128 BPM track + Every 2 beats → Device stat shows 64 BPM (no "÷2" badge if cap not hit, but the divider should be visible in the stat — match design exactly).
 - 160 BPM track + Every 2 beats + cap 60 → Device shows 60 with "Capped" badge.
 - 100 BPM track + Every beat + uncapped → Music = Device = 100, no badge.

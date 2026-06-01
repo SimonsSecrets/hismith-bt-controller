@@ -87,6 +87,7 @@ public partial class App : Application
             builder.AddProvider(new FileLoggerProvider(FileLoggerProvider.DefaultLogDirectory));
         });
         services.AddSingleton(settings);
+        services.AddSingleton<UserPreferencesStore>();
 
         if (mockBle)
         {
@@ -156,7 +157,12 @@ public partial class App : Application
     protected override async void OnExit(ExitEventArgs e)
     {
         if (_serviceProvider is not null)
+        {
+            // Flush any debounced Sound Mode preference write before teardown so a
+            // change made within the debounce window right before quitting isn't lost.
+            _serviceProvider.GetService<SoundModeViewModel>()?.FlushPendingPreferences();
             await _serviceProvider.DisposeAsync();
+        }
 
         base.OnExit(e);
     }

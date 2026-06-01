@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HismithController.Audio;
 using HismithController.BeatDetection;
+using HismithController.Configuration;
 using HismithController.SoundMode;
 
 namespace HismithController.ViewModels;
@@ -14,6 +15,16 @@ public partial class SoundModeViewModel : ObservableObject
     private readonly IAudioCaptureService _audioService;
     private readonly SpectrumAnalyzer     _spectrumAnalyzer;
     private readonly IBeatDetector        _beatDetector;
+    private readonly UserPreferencesStore _prefsStore;
+
+    // Debounces persistence of SelectedRhythm/MaxBpm: the cap slider fires many
+    // changes per drag, so we coalesce writes to one ~400 ms after the last change
+    // rather than hitting disk on every tick.
+    private readonly DispatcherTimer _persistTimer;
+
+    // Set while applying loaded preferences in the ctor so the property-change
+    // handlers don't immediately schedule a redundant write-back.
+    private bool _suppressPersist;
 
     // Resets BeatTick to false ~120 ms after each beat so DataTriggers that
     // bind to BeatTick can observe the false→true transition on the next beat.
@@ -158,11 +169,13 @@ public partial class SoundModeViewModel : ObservableObject
     public SoundModeViewModel(
         IAudioCaptureService audioService,
         SpectrumAnalyzer     spectrumAnalyzer,
-        IBeatDetector        beatDetector)
+        IBeatDetector        beatDetector,
+        UserPreferencesStore prefsStore)
     {
         _audioService     = audioService;
         _spectrumAnalyzer = spectrumAnalyzer;
         _beatDetector     = beatDetector;
+        _prefsStore       = prefsStore;
 
         _audioService.StateChanged         += OnCaptureStateChanged;
         _spectrumAnalyzer.SpectrumUpdated  += OnSpectrumUpdated;
@@ -177,6 +190,10 @@ public partial class SoundModeViewModel : ObservableObject
         _pulseTimer = new DispatcherTimer();
         _pulseTimer.Tick += OnPulseTimerTick;
 
+        _persistTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        _persistTimer.Tick += OnPersistTimerTick;
+
+        LoadPreferences();
         UpdateRhythmSelection();
     }
 
@@ -188,6 +205,7 @@ public partial class SoundModeViewModel : ObservableObject
 
     public async Task DeactivateAsync()
     {
+        FlushPendingPreferences();  // persist any pending rhythm/cap change before leaving the tab
         IsDrivingDevice = false;   // triggers OnIsDrivingDeviceChanged → stops timer + clears BeatTick
         await _audioService.StopAsync();
         // Stop the hold timer so it cannot fire a HasAudio change after tab exit.
@@ -217,7 +235,51 @@ public partial class SoundModeViewModel : ObservableObject
             option.IsSelected = option.Rhythm == SelectedRhythm;
     }
 
-    partial void OnSelectedRhythmChanged(ThrustRhythm value) => UpdateRhythmSelection();
+    partial void OnSelectedRhythmChanged(ThrustRhythm value)
+    {
+        UpdateRhythmSelection();
+        SchedulePersist();
+    }
+
+    partial void OnMaxBpmChanged(int value) => SchedulePersist();
+
+    // ── Preference persistence ─────────────────────────────────────────────────
+
+    private void LoadPreferences()
+    {
+        var prefs = _prefsStore.Load();
+        _suppressPersist = true;   // applying loaded values must not trigger a write-back
+        SelectedRhythm = prefs.SelectedRhythm;
+        MaxBpm = prefs.MaxBpm;
+        _suppressPersist = false;
+    }
+
+    // Restart the debounce so a burst of changes (e.g. a slider drag) collapses to a
+    // single write shortly after the user stops adjusting.
+    private void SchedulePersist()
+    {
+        if (_suppressPersist) return;
+        _persistTimer.Stop();
+        _persistTimer.Start();
+    }
+
+    private void OnPersistTimerTick(object? sender, EventArgs e)
+    {
+        _persistTimer.Stop();
+        SavePreferences();
+    }
+
+    // Write immediately, cancelling any pending debounce. Called on tab deactivation
+    // and app exit so an in-flight change isn't lost.
+    public void FlushPendingPreferences()
+    {
+        if (!_persistTimer.IsEnabled) return;
+        _persistTimer.Stop();
+        SavePreferences();
+    }
+
+    private void SavePreferences()
+        => _prefsStore.Save(new UserPreferences { SelectedRhythm = SelectedRhythm, MaxBpm = MaxBpm });
 
     // Called by the global emergency stop. Disables device driving so no further
     // BPM is sent until the user opts back in; the bound play/pause button flips

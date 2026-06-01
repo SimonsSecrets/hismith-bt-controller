@@ -378,7 +378,14 @@ These guards exist because of concrete bugs:
 - **Cap UI (§4.2):** a 0–240 slider bound to `MaxBpm`, a `"{MaxBpm} BPM · {MaxBpmPercent}%"` readout,
   and a "Capped" pill shown whenever `IsCapped` (cap set below full scale). `IsCapActive`
   (driving + capped + post-ratio tempo has reached the ceiling) drives a second gold "Capped"
-  badge next to the Device stat. **`MaxBpm` is not yet persisted** — that is §4.3.
+  badge next to the Device stat.
+- **Persistence (§4.3):** `SelectedRhythm` and `MaxBpm` survive restarts via `UserPreferencesStore`
+  (`Configuration/`), which reads/writes `user-settings.json` under `%LOCALAPPDATA%\HismithController\`
+  — separate from the read-only bundled `AppConfig.json`. The view-model loads prefs in its ctor
+  (guarded so applying them doesn't re-trigger a save) and persists on change through a ~400 ms
+  debounce, flushed on tab deactivation (`DeactivateAsync`) and app exit (`App.OnExit`). Enums are
+  stored by name so reordering `ThrustRhythm` can't reinterpret old files; a missing/corrupt file or
+  out-of-range cap falls back to defaults.
 - **The mapping is display-only right now.** Phase 3 (sending `deviceBpm` to the BLE device) and
   §4.2/§4.3 (max-speed cap + persistence) are **not** implemented. `DeviceBpm`/`DeviceSpeedPercent`
   return **0 unless `IsActivelyDriving`** (audio present **and** Play engaged), matching the design's
