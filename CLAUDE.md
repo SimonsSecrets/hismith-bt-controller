@@ -38,14 +38,22 @@ dotnet test HismithController.slnx
 
 Project targets `net8.0-windows10.0.19041.0` (required for WinRT BLE APIs).
 
-## Beat Detection
+## Beat Detection / Sound Mode
 
-Spectral flux with adaptive threshold (`SpectralFluxAnalyzer.cs`):
-- FFT size: 512 samples (~11.6ms at 44100 Hz), hop size: 256 samples (50% overlap)
-- Positive spectral flux: `sum(max(0, |X[k]| - |X_prev[k]|))` over low-frequency bins
-- Threshold: `mean(last 40 flux values) * OnsetMultiplier` (default 1.5)
-- Min inter-onset interval: 200ms (caps detection at 300 BPM)
-- Beat detection runs synchronously on the NAudio audio thread — must stay under 5ms per frame
+📄 **Full implementation reference: [documentation/SoundModeImplementation.md](documentation/SoundModeImplementation.md)** —
+explains the audio→beat→BPM pipeline, the algorithm choices, and the *why* behind each
+decision (including reversed ones). **Read and update it when changing anything in
+`Features/Audio/` or `Features/BeatDetection/`.**
+
+Quick summary (`SpectralFluxBeatDetector.cs`):
+- **Onset detection** (audio thread): positive spectral flux `sum(max(0, |X[k]| - |X_prev[k]|))`
+  over the kick/bass band (FFT 512 / hop 256), adaptive threshold `mean(last 40) * OnsetMultiplier`,
+  **local-maximum peak-picking**, 200ms min inter-onset gate, gated on capture state `Running`.
+  Drives only the `BeatDetected` event (visual pulse / liveness). Must stay under 5ms/frame.
+- **Tempo / BPM** (500ms timer thread): **autocorrelation of the onset-strength envelope** — NOT
+  derived from onset intervals (that approach clipped songs to 240 and jittered on metronomes).
+  A sparsity classifier decides only whether to octave-fold (dense music) or not (sparse metronome).
+- The old IBI-median `BpmEstimator` has been removed.
 
 ## Hismith BLE Protocol
 
