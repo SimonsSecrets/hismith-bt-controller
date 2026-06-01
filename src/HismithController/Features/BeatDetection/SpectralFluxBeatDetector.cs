@@ -121,7 +121,13 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     private volatile float _autoConf;
 
     // Octave-fold hysteresis state. Touched only by the tempo timer thread.
+    // Currently COMPUTED BUT NOT CONSUMED: octave folding is deliberately disabled
+    // (see OnTempoTimer) while the autocorrelation estimator runs unfolded for all
+    // input. The classifier is retained, not deleted, so folding can be re-enabled
+    // later (e.g. behind a music/metronome UI toggle) without rebuilding it.
+#pragma warning disable CS0414 // assigned for the retained classifier; intentionally unread for now
     private bool _foldDense;
+#pragma warning restore CS0414
 
     // Tempo is estimated by autocorrelation of the onset-strength envelope in BOTH
     // regimes. Autocorrelation recovers the dominant period robustly even when the
@@ -342,8 +348,13 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
         else if (sparsity >= _sparsityMetronomeMin)
             _foldDense = false;
 
-        // TEMPORARY (diagnostic): octave folding forced off to verify the BPM-jump bug
-        // lives in the sparsity classifier / fold path. Revert once confirmed.
+        // Octave folding is deliberately DISABLED (fold: false), not driven by _foldDense.
+        // The autocorrelation estimator's subharmonic-rejection step already recovers the
+        // fundamental for accented metronomes that previously flapped between a tempo and
+        // its divisors, and unfolded reporting preserves the true tempo across the full
+        // 15–240 BPM range for both music and click trains. The sparsity classifier above
+        // still runs so this can be re-enabled (pass fold: _foldDense) if a future music
+        // mode wants octave folding back. See documentation/SoundModeImplementation.md §6.
         var est = _tempoEstimator.Analyze(snapshot, HopMs, fold: false);
         _autoBpm  = est.Bpm;
         _autoConf = est.Confidence;

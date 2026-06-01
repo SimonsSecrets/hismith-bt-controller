@@ -53,7 +53,12 @@ Quick summary (`SpectralFluxBeatDetector.cs`):
   The visual beat pulse is paced off `CurrentBpm` in the ViewModel, not off these onsets.
 - **Tempo / BPM** (500ms timer thread): **autocorrelation of the onset-strength envelope** — NOT
   derived from onset intervals (that approach clipped songs to 240 and jittered on metronomes).
-  A sparsity classifier decides only whether to octave-fold (dense music) or not (sparse metronome).
+  A **subharmonic-rejection** step promotes the global-max lag to its true fundamental (L/2, L/3, L/4),
+  fixing the `100→50→25` octave flap on accented metronomes.
+- **Octave folding is currently DISABLED** (`Analyze(..., fold: false)`): the estimator runs unfolded
+  for all input. The sparsity classifier still runs but its result is unconsumed and retained (not
+  deleted) so folding can be re-enabled later (e.g. a music/metronome UI toggle). See §5.5 / §6 of the
+  implementation doc.
 - The old IBI-median `BpmEstimator` has been removed.
 
 ## Hismith BLE Protocol

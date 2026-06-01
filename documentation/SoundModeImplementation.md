@@ -211,14 +211,40 @@ periodic input.
 - **Lag range** spans `MinBpm = 15` to `MaxBpm = 240` BPM; `lagMax` is also capped at
   `N/2` so every lag has enough overlap.
 - **Biased normalization** (`sum / Σdev²`, a constant divisor) rather than unbiased
-  (`/(N−lag)`). Biased deliberately favors *shorter* lags, so the picked peak is the
-  fundamental or a **higher** harmonic of the true tempo — never a subharmonic. The fold
-  stage (below) can divide a too-fast pick down into range, but it cannot recover a
-  too-slow (halved) pick. Unbiased normalization would inflate slow lags and risk locking
-  onto a half-tempo subharmonic.
+  (`/(N−lag)`). Biased deliberately favors *shorter* lags, which biases the picked peak
+  toward the fundamental. This bias is real but **only ~10 % per octave** (peaks decay
+  like `(N−lag)/N`), so it is *not* strong enough on its own to guarantee the fundamental
+  over a subharmonic — see §5.5. Unbiased normalization would inflate slow lags and lock
+  onto a half-tempo subharmonic outright.
+- **Subharmonic rejection** (see §5.5) corrects the residual octave error directly, so the
+  reported tempo is the true click rate even for accented metronomes.
 - **Parabolic interpolation** around the peak gives sub-lag precision, which matters at
   small lags where one sample is several BPM.
 - **Confidence** = the normalized autocorrelation at the peak (a 0–1 correlation strength).
+
+### 5.5 Subharmonic rejection (octave-down correction)
+Autocorrelation peaks at the true period **and every integer multiple of it**, so the
+global-max lag can be a *sub-tempo*. This actually happens with metronomes: in the
+0–300 Hz kick/bass band, accented and unaccented clicks carry different energy, so every
+other (or every fourth) click dominates the envelope and the **half/quarter-tempo peak
+wins the global max**. The symptom was a readout flapping `100 → 50 → 25` even with
+folding off — i.e. the bug was *not* the fold classifier (§6) but the raw peak pick.
+
+The fix (`AutocorrelationTempoEstimator.Analyze`): after the global-max lag `L` is found,
+test its divisor lags `L/2, L/3, L/4`. If a divisor lands on a clear **local-maximum**
+peak whose strength is ≥ `SubharmonicPeakFraction` (0.30) of the global peak, promote to
+the **shortest** such lag (largest factor ⇒ fastest tempo ⇒ true fundamental). Key details:
+
+- The divisor is searched over a **±3-sample neighbourhood** (`SubharmonicSearchRadius`),
+  because integer rounding of `L/factor` (e.g. `207/2 = 104` vs. the real peak at `103`)
+  otherwise lands beside the peak and silently fails the local-max test.
+- The acceptance bar is **low (0.30)** on purpose: a strong accent pulls the fundamental
+  peak well below the sub-tempo peak. It stays safe because *only the exact divisor lags*
+  are tested, not every short lag — and on a **clean** train the divisor lags fall on
+  autocorrelation **troughs**, so the train is left untouched.
+- Applies in **both** fold modes; with folding on it just sharpens which harmonic feeds
+  the fold. Guarded by `Analyze_AccentedMetronome_ReportsBeatNotSubharmonic` (a `[Theory]`
+  over half- and quarter-tempo accents) which fails if the step is removed.
 
 ### 5.4 Octave folding and the preferred-tempo weighting
 Autocorrelation peaks at the true period *and its multiples*, so a 120 BPM song also
@@ -228,11 +254,22 @@ preference is a Gaussian in `log2(BPM)` centered on `PreferredBpmCenter = 120`
 (`PreferredBpmSigma = 0.5` octaves). This collapses half/double-tempo readings toward a
 musical range (~60–180) **without a hard cap**.
 
-Folding is **not always applied** — see §6.
+Folding is **currently disabled** (and was always conditional) — see §6.
 
 ---
 
-## 6. The regime classifier — when to fold (and the bugs it fixes)
+## 6. The regime classifier — when to fold (and why it is currently disabled)
+
+> **Status (current): octave folding is DISABLED.** `OnTempoTimer` calls the estimator
+> with `fold: false` for *all* input. The autocorrelation now runs unfolded everywhere;
+> subharmonic rejection (§5.5) handles the octave error that folding used to clean up,
+> and unfolded reporting keeps the true tempo across the full 15–240 BPM range for music
+> and metronomes alike. The sparsity classifier below **still runs** but its `_foldDense`
+> result is **not consumed** — it is retained (not deleted) so folding can be re-enabled
+> later (e.g. behind a music/metronome UI toggle) by passing `fold: _foldDense` again.
+> This is a deliberate decision pending a possible future music mode, not a temporary hack.
+>
+> The rest of this section documents the classifier as built, for when/if it is re-enabled.
 
 Folding is right for dense music but **wrong for a fast metronome**: folding a 200 BPM
 click train would report 100, violating the requirement that metronome input keep its
