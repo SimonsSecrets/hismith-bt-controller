@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Media.Animation;
 using HismithController.ViewModels;
 
@@ -41,20 +40,13 @@ public partial class SoundModeView : UserControl
     // high BPM never miss a pulse or leave stale animated values behind.
     private void OnBeatPulse()
     {
+        // Full-bleed border flash (design beatRingPulse: opacity 0.85 → 0 over 360 ms,
+        // no scale — the border is fixed at the visualizer's edge).
         var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
-        var duration = new Duration(TimeSpan.FromMilliseconds(350));
+        var duration = new Duration(TimeSpan.FromMilliseconds(360));
 
-        // Opacity: flash in at 0.75 and decay to 0 — ring fades out as it expands.
         BeatRingElement.BeginAnimation(
             UIElement.OpacityProperty,
-            new DoubleAnimation(0.75, 0, duration) { EasingFunction = easing });
-
-        // Scale: expand from 0.7× to 1.4× around the ring's own centre.
-        // RenderTransformOrigin="0.5,0.5" on the Ellipse ensures it grows
-        // outward symmetrically without translating.
-        var transform = (ScaleTransform)BeatRingElement.RenderTransform;
-        var scaleAnim = new DoubleAnimation(0.7, 1.4, duration) { EasingFunction = easing };
-        transform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnim);
-        transform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnim);
+            new DoubleAnimation(0.85, 0, duration) { EasingFunction = easing });
     }
 }

@@ -22,7 +22,7 @@ namespace HismithController.Converters;
 //   playback device) still produce clearly visible bars:
 //
 //     −130 dB (3.2e-7):   0 %  — floor
-//     −100 dB (1.0e-5):  27 %  — quiet high-frequency transients (~24 px)
+//     −100 dB (1.0e-5):  27 %  — quiet high-frequency transients (~38 px)
 //      −86 dB (5.0e-5):  40 %  — dominant bins at quiet capture levels
 //      −60 dB (1.0e-3):  64 %  — moderate signal
 //      −40 dB (1.0e-2):  82 %  — typical music content
@@ -34,8 +34,8 @@ namespace HismithController.Converters;
 //   FrameworkElement.Height is always reliable from a DataTemplate binding.
 public sealed class BinToHeightConverter : IValueConverter
 {
-    // Must stay in sync with the container Height="90" in SoundModeView.xaml.
-    private const double BarMaxHeight = 90.0;
+    // Must stay in sync with the container Height="140" in SoundModeView.xaml.
+    private const double BarMaxHeight = 140.0;
 
     // dB window: [DbFloor, DbCeiling] maps linearly to [0, 1].
     private const double DbFloor   = -130.0;

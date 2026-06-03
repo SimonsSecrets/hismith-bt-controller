@@ -20,16 +20,17 @@
         <TextBlock Text="Sound mode"
                    FontSize="13" FontWeight="SemiBold"
                    Foreground="{DynamicResource TextBrush}" />
-        <TextBlock Text="Beats from your system audio drive the device."
-                   FontSize="12" Foreground="{DynamicResource TextDimBrush}"
-                   Margin="0,2,0,14" />
+        <TextBlock FontSize="12" Foreground="{DynamicResource TextDimBrush}"
+                   Margin="0,2,0,14" TextWrapping="Wrap">
+            Beats from your system audio drive the device. This currently works best with metronome-style input sounds.
+        </TextBlock>
 
         <!-- ========== VISUALIZER ========== -->
         <!-- x:Name lets the centered transport button bind to this Border's
              IsMouseOver so the pause control reveals on hover while playing. -->
         <Border x:Name="Visualizer"
-                CornerRadius="8" Height="90" ClipToBounds="True"
-                Background="{DynamicResource SurfaceSoftBrush}">
+                CornerRadius="14" Height="140" ClipToBounds="True"
+                Background="{DynamicResource VizBackgroundBrush}">
             <Grid>
 
                 <!-- Spectrum bars: 56 centre-anchored columns bound to SpectrumBins.
@@ -73,7 +74,7 @@
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemContainerStyle>
-                        <!-- Stretch fills the full 90 px cell so ContentPresenter passes
+                        <!-- Stretch fills the full 140 px cell so ContentPresenter passes
                              the complete cell height to the bar, letting
                              VerticalAlignment="Center" anchor growth at the mid-point. -->
                         <Style TargetType="ContentPresenter">
@@ -82,46 +83,48 @@
                     </ItemsControl.ItemContainerStyle>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
+                            <!-- Vertical rose→peach gradient + ~6 px design radius scaled
+                                 to the ~2 px bar width (3 reads as rounded; 6 would render
+                                 as a full pill on a bar this thin). -->
                             <Border Margin="1.5,0"
-                                    Background="{DynamicResource RoseBrush}"
-                                    CornerRadius="1.5"
+                                    CornerRadius="3"
                                     VerticalAlignment="Center"
-                                    Height="{Binding Value, Converter={StaticResource BinToHeight}}" />
+                                    Height="{Binding Value, Converter={StaticResource BinToHeight}}">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="{DynamicResource RoseColor}" Offset="0" />
+                                        <GradientStop Color="#E0A07F" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- Beat ring: centred over the visualizer, animated by the code-behind
-                     on each BeatPulse event. Starts invisible (Opacity=0); BeginAnimation
-                     flashes it to 0.75 and decays to 0 while the ScaleTransform expands
-                     from 0.7× to 1.4×. RenderTransformOrigin="0.5,0.5" makes the ring
-                     grow outward symmetrically without translating. -->
-                <Ellipse x:Name="BeatRingElement"
-                         Width="68" Height="68"
-                         Stroke="{DynamicResource RoseBrush}"
-                         StrokeThickness="2"
-                         Fill="Transparent"
-                         Opacity="0"
-                         HorizontalAlignment="Center"
-                         VerticalAlignment="Center"
-                         IsHitTestVisible="False"
-                         RenderTransformOrigin="0.5,0.5">
-                    <Ellipse.RenderTransform>
-                        <ScaleTransform ScaleX="1" ScaleY="1" />
-                    </Ellipse.RenderTransform>
-                </Ellipse>
+                <!-- Beat ring: a full-bleed rounded-rect border flashing around the
+                     entire visualizer (design .viz-beat-ring: inset:0, 2px rose, 14px
+                     radius). Animated by the code-behind on each BeatPulse event: starts
+                     invisible (Opacity=0), flashes to 0.85 and decays to 0. CornerRadius
+                     matches the visualizer's 14 px; sits above the bars but below the
+                     transport button. -->
+                <Border x:Name="BeatRingElement"
+                        BorderBrush="{DynamicResource RoseBrush}"
+                        BorderThickness="2"
+                        CornerRadius="14"
+                        Opacity="0"
+                        IsHitTestVisible="False" />
 
                 <!-- Detection-paused badge: overlaid at the top-right of the visualizer
                      (matching the design's top:12 / right:14). Shown when device
                      driving is off and there IS audio (idle overlay handles the
                      no-audio case anyway). -->
+                <!-- Gold-tinted, borderless pill with #8B6630 text/glyph and SemiBold
+                     weight (design .pause-badge: gold-tint bg, color #8B6630, weight 600). -->
                 <Border HorizontalAlignment="Right" VerticalAlignment="Top"
                         Margin="0,12,14,0"
-                        Background="{DynamicResource SurfaceSoftBrush}"
-                        BorderBrush="{DynamicResource AppBorderBrush}"
-                        BorderThickness="1"
+                        Background="{DynamicResource GoldTintBrush}"
                         CornerRadius="10"
-                        Padding="10,4"
+                        Padding="10,5"
                         IsHitTestVisible="False"
                         Visibility="{Binding IsDrivingDevice,
                                      Converter={StaticResource BoolToVis},
@@ -131,14 +134,14 @@
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                     Margin="0,0,6,0">
                             <Rectangle Width="2.5" Height="9" RadiusX="1" RadiusY="1"
-                                       Fill="{DynamicResource TextDimBrush}" />
+                                       Fill="#8B6630" />
                             <Rectangle Width="2.5" Height="9" RadiusX="1" RadiusY="1"
-                                       Fill="{DynamicResource TextDimBrush}"
+                                       Fill="#8B6630"
                                        Margin="3,0,0,0" />
                         </StackPanel>
                         <TextBlock Text="Detection paused"
-                                   FontSize="11"
-                                   Foreground="{DynamicResource TextDimBrush}"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   Foreground="#8B6630"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
@@ -163,9 +166,90 @@
                             </Style.Triggers>
                         </Style>
                     </Grid.Style>
-                    <TextBlock Text="Play some music to get started"
-                               FontSize="12" Foreground="{DynamicResource TextDimBrush}"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <!-- Three bobbing dots above the prompt (design .idle-rings):
+                             12 px circles, each looping translateY 0→-4 + opacity
+                             0.5→1 over 1.4 s (0.7 s out, AutoReverse back), staggered
+                             0 / 0.2 / 0.4 s. Started on Loaded; SineEase gives the CSS
+                             ease-in-out feel. Deliberate deviation from the design's
+                             rose-tint fill: that token is nearly invisible against our
+                             solid soft-surface idle background, so we use the stronger
+                             RoseBrush for contrast. -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                    Margin="0,0,0,8">
+                            <StackPanel.Triggers>
+                                <EventTrigger RoutedEvent="StackPanel.Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                            <DoubleAnimation Storyboard.TargetName="Dot1"
+                                                             Storyboard.TargetProperty="RenderTransform.Y"
+                                                             From="0" To="-4" Duration="0:0:0.7" BeginTime="0:0:0">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <SineEase EasingMode="EaseInOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="Dot1"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             From="0.5" To="1" Duration="0:0:0.7" BeginTime="0:0:0">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <SineEase EasingMode="EaseInOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="Dot2"
+                                                             Storyboard.TargetProperty="RenderTransform.Y"
+                                                             From="0" To="-4" Duration="0:0:0.7" BeginTime="0:0:0.2">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <SineEase EasingMode="EaseInOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="Dot2"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             From="0.5" To="1" Duration="0:0:0.7" BeginTime="0:0:0.2">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <SineEase EasingMode="EaseInOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="Dot3"
+                                                             Storyboard.TargetProperty="RenderTransform.Y"
+                                                             From="0" To="-4" Duration="0:0:0.7" BeginTime="0:0:0.4">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <SineEase EasingMode="EaseInOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="Dot3"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             From="0.5" To="1" Duration="0:0:0.7" BeginTime="0:0:0.4">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <SineEase EasingMode="EaseInOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </StackPanel.Triggers>
+                            <Ellipse x:Name="Dot1" Width="12" Height="12" Opacity="0.5"
+                                     Fill="{DynamicResource RoseBrush}" RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <TranslateTransform />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                            <Ellipse x:Name="Dot2" Width="12" Height="12" Opacity="0.5" Margin="6,0,0,0"
+                                     Fill="{DynamicResource RoseBrush}" RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <TranslateTransform />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                            <Ellipse x:Name="Dot3" Width="12" Height="12" Opacity="0.5" Margin="6,0,0,0"
+                                     Fill="{DynamicResource RoseBrush}" RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <TranslateTransform />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </StackPanel>
+                        <TextBlock Text="Play some music to get started"
+                                   FontSize="12" Foreground="{DynamicResource TextDimBrush}"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
                 </Grid>
 
                 <!-- Centered transport button — overlaid on top of everything.
@@ -282,7 +366,7 @@
              (0 while not actively driving). The "÷N" rhythm badge is overlaid centered
              on the Music↔Device boundary — see the overlay Grid after the stats. -->
         <Grid Margin="0,14,0,0">
-            <Border CornerRadius="8"
+            <Border CornerRadius="12"
                     Background="{DynamicResource SurfaceSoftBrush}"
                     BorderBrush="{DynamicResource AppBorderBrush}"
                     BorderThickness="1"
@@ -292,8 +376,11 @@
 
                     <!-- Music stat -->
                     <StackPanel HorizontalAlignment="Center">
-                        <TextBlock Text="MUSIC"
-                                   FontSize="9" FontWeight="SemiBold"
+                        <!-- Hair spaces (U+200A) between letters approximate the design's
+                             letter-spacing: 0.08em — WPF TextBlock has no letter-spacing /
+                             CharacterSpacing property, so tracking is faked with thin glyphs. -->
+                        <TextBlock Text="M&#x200A;U&#x200A;S&#x200A;I&#x200A;C"
+                                   FontSize="10" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDimBrush}"
                                    HorizontalAlignment="Center" />
                         <StackPanel Orientation="Horizontal"
@@ -303,13 +390,13 @@
                                  show it whenever audio is present, independent of play
                                  state. Play only gates driving the device (Device/Speed). -->
                             <TextBlock Text="{Binding LiveBpm}"
-                                       FontSize="17" FontWeight="SemiBold"
+                                       FontSize="18" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextBrush}"
                                        Visibility="{Binding HasAudio,
                                                     Converter={StaticResource BoolToVis}}" />
                             <!-- No audio: show a dash -->
                             <TextBlock Text="—"
-                                       FontSize="17" FontWeight="SemiBold"
+                                       FontSize="18" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextDimBrush}"
                                        Visibility="{Binding HasAudio,
                                                     Converter={StaticResource BoolToVis},
@@ -325,15 +412,15 @@
                     <!-- Device stat: post-ratio device BPM. DeviceBpm returns 0 while
                          not actively driving (paused / silent), matching the design. -->
                     <StackPanel HorizontalAlignment="Center">
-                        <TextBlock Text="DEVICE"
-                                   FontSize="9" FontWeight="SemiBold"
+                        <TextBlock Text="D&#x200A;E&#x200A;V&#x200A;I&#x200A;C&#x200A;E"
+                                   FontSize="10" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDimBrush}"
                                    HorizontalAlignment="Center" />
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
                                     Margin="0,3,0,0">
                             <TextBlock Text="{Binding DeviceBpm}"
-                                       FontSize="17" FontWeight="SemiBold"
+                                       FontSize="18" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextBrush}" />
                             <TextBlock Text=" bpm"
                                        FontSize="10"
@@ -359,15 +446,15 @@
                     <!-- Speed stat: device BPM as a % of the 240 full-scale (design's
                          fixed reference). DeviceSpeedPercent returns 0 while not driving. -->
                     <StackPanel HorizontalAlignment="Center">
-                        <TextBlock Text="SPEED"
-                                   FontSize="9" FontWeight="SemiBold"
+                        <TextBlock Text="S&#x200A;P&#x200A;E&#x200A;E&#x200A;D"
+                                   FontSize="10" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDimBrush}"
                                    HorizontalAlignment="Center" />
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
                                     Margin="0,3,0,0">
                             <TextBlock Text="{Binding DeviceSpeedPercent}"
-                                       FontSize="17" FontWeight="SemiBold"
+                                       FontSize="18" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextBrush}" />
                             <TextBlock Text=" %"
                                        FontSize="10"
@@ -409,9 +496,11 @@
         <!-- ========== THRUST RHYTHM SELECTOR ========== -->
         <!-- Header row: title (left) + muted hint (right). -->
         <Grid Margin="0,18,0,8">
-            <TextBlock Text="Thrust rhythm"
+            <!-- Design .label: uppercase, text-dim, weight 600, letter-spacing 0.04em
+                 (tracking faked with hair spaces — WPF has no letter-spacing). -->
+            <TextBlock Text="THRUST RHYTHM"
                        FontSize="12" FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextBrush}"
+                       Foreground="{DynamicResource TextDimBrush}"
                        HorizontalAlignment="Left" VerticalAlignment="Center" />
             <TextBlock Text="How many beats per stroke"
                        FontSize="11"
@@ -492,9 +581,10 @@
         <!-- Header row: title (left) + "{MaxBpm} BPM · {MaxBpmPercent}%" readout and a
              "Capped" pill (right) shown whenever a cap is set (MaxBpm < 240). -->
         <Grid Margin="0,20,0,10">
-            <TextBlock Text="Max device speed"
+            <!-- Design .label: uppercase, text-dim, weight 600, letter-spacing 0.04em. -->
+            <TextBlock Text="MAX DEVICE SPEED"
                        FontSize="12" FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextBrush}"
+                       Foreground="{DynamicResource TextDimBrush}"
                        HorizontalAlignment="Left" VerticalAlignment="Center" />
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right" VerticalAlignment="Center">

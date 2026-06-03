@@ -13,6 +13,14 @@
     <Color x:Key="SurfaceSoftColor">#2D2229</Color>
     <SolidColorBrush x:Key="SurfaceSoftBrush" Color="{StaticResource SurfaceSoftColor}" />
 
+    <!-- Visualizer background gradient (design viz-bg-top / viz-bg-bot tokens, dark palette) -->
+    <Color x:Key="VizBgTopColor">#2A1B23</Color>
+    <Color x:Key="VizBgBotColor">#1A1218</Color>
+    <LinearGradientBrush x:Key="VizBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource VizBgTopColor}" Offset="0" />
+        <GradientStop Color="{StaticResource VizBgBotColor}" Offset="1" />
+    </LinearGradientBrush>
+
     <!-- Borders -->
     <Color x:Key="BorderColor">#3A2C36</Color>
     <SolidColorBrush x:Key="AppBorderBrush" Color="{StaticResource BorderColor}" />

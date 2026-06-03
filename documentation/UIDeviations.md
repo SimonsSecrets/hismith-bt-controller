@@ -159,37 +159,40 @@ Issues that the user does not want to fix are marked with [SKIP]
   DataTrigger in the view" at line ~98, but no element consumes it.)
 - **Fix:** add the top-left listening pill + blinking/beat live-dot.
 
-### 7.2 🟡 Visualizer height too short
+### 7.2 ✅ Visualizer height — IMPLEMENTED
 - **Design** (`.visualizer.compact`): 140 px tall.
-- **WPF** (`SoundModeView.xaml:31`): `Height=90`.
-- **Fix:** set the visualizer height to 140.
+- **Done** (`SoundModeView.xaml`): visualizer `Height=140`. `BinToHeightConverter.BarMaxHeight` was
+  coupled to the old 90 px and bumped to 140 too, so the bars fill the full height.
 
-### 7.3 🟡 Visualizer has no background gradient
-- **Design** (`.visualizer`): vertical gradient `--viz-bg-top` (`#FBEFF3`) → `--viz-bg-bot` (`#FFF7F0`).
-- **WPF** (`SoundModeView.xaml:32`): solid `SurfaceSoftBrush`.
-- **Fix:** use a `LinearGradientBrush` with the two viz tokens (add them to the theme).
+### 7.3 ✅ Visualizer background gradient — IMPLEMENTED
+- **Design** (`.visualizer`): vertical gradient `viz-bg-top` (`#FBEFF3`) → `viz-bg-bot` (`#FFF7F0`).
+- **Done**: added `VizBgTopColor`/`VizBgBotColor` + a `VizBackgroundBrush` `LinearGradientBrush` to
+  both `LightTheme.xaml` and `DarkTheme.xaml` (dark: `#2A1B23`→`#1A1218`); the visualizer Border now
+  uses `VizBackgroundBrush` so it follows the theme.
 
-### 7.4 🟡 Visualizer corner radius
+### 7.4 ✅ Visualizer corner radius — IMPLEMENTED
 - **Design**: 14 px.
-- **WPF** (`SoundModeView.xaml:31`): `CornerRadius=8`.
-- **Fix:** set to 14 (also update the idle-overlay/clip to match).
+- **Done** (`SoundModeView.xaml`): visualizer `CornerRadius=14`; `ClipToBounds` already clips the
+  inner overlays to the new radius.
 
-### 7.5 🟡 Spectrum bars: solid color, wrong corner radius
+### 7.5 ✅ Spectrum bars: gradient + corner radius — IMPLEMENTED
 - **Design** (`.viz-bars i`): each bar is a vertical gradient rose→`#E0A07F`, `border-radius: 6px`.
-- **WPF** (`SoundModeView.xaml:85-89`): solid `RoseBrush`, `CornerRadius=1.5`.
-- **Fix:** apply the bar gradient and a ~6 px corner radius (scaled to bar width).
+- **Done** (`SoundModeView.xaml`): bars use a vertical `RoseColor`→`#E0A07F` `LinearGradientBrush`;
+  `CornerRadius=3` (a practical match — 6 px renders as a full pill on a ~2 px-wide bar).
 
-### 7.6 🟡 Beat indicator is the wrong shape
-- **Design** (`modes.jsx` sound mode uses `.viz-beat-ring`): the beat pulse is a **rounded-rectangle
-  border flashing around the entire visualizer** (`inset:0`, 2 px rose, 14 px radius), fading out.
-- **WPF** (`SoundModeView.xaml:99-112`): a small **68 px circle** (`Ellipse`) centered in the visualizer.
-- **Fix:** replace the centered ellipse with a full-bleed rounded-rect border overlay that flashes on
-  each beat.
+### 7.6 ✅ Beat indicator = full-bleed border flash — IMPLEMENTED
+- **Design** (`.viz-beat-ring`): the beat pulse is a **rounded-rectangle border flashing around the
+  entire visualizer** (`inset:0`, 2 px rose, 14 px radius), opacity 0.85→0 over 360 ms.
+- **Done**: replaced the centered 68 px `Ellipse` with a full-bleed `Border x:Name="BeatRingElement"`
+  (2 px rose, 14 px radius); the code-behind `OnBeatPulse` now animates only opacity 0.85→0 over
+  360 ms (the scale animation was dropped).
 
-### 7.7 🟢 Idle overlay missing the bobbing dots
-- **Design** (`.viz-idle .idle-rings`): three rose bobbing dots above "Play some music to get started".
-- **WPF** (`SoundModeView.xaml:151-169`): only the text label, no animated dots.
-- **Fix:** add the three bobbing dots.
+### 7.7 ✅ Idle bobbing dots — IMPLEMENTED
+- **Design** (`.viz-idle .idle-rings`): three bobbing dots above "Play some music to get started".
+- **Done** (`SoundModeView.xaml`): three 12 px dots above the prompt, each looping translateY 0→-4 +
+  opacity 0.5→1 over 1.4 s (0.7 s + AutoReverse), staggered 0/0.2/0.4 s with a SineEase, started on
+  `Loaded`. **Deviation:** fill is the stronger `RoseBrush`, not the design's near-invisible
+  `rose-tint`, for contrast against the solid soft-surface idle background (user-approved).
 
 ---
 
@@ -200,15 +203,16 @@ Issues that the user does not want to fix are marked with [SKIP]
 - **WPF** (`SoundModeView.xaml:291`): `UniformGrid` columns with no dividers.
 - **Fix:** add vertical 1 px separators between the three stat columns.
 
-### 8.2 🟢 Stats bar corner radius
+### 8.2 ✅ Stats bar corner radius — IMPLEMENTED
 - **Design**: `border-radius: 12px`.
-- **WPF** (`SoundModeView.xaml:285`): `CornerRadius=8`.
-- **Fix:** set to 12.
+- **Done** (`SoundModeView.xaml`): stats bar `CornerRadius=12`.
 
-### 8.3 🟢 Stat value font size
+### 8.3 ✅ Stat value font size — IMPLEMENTED
 - **Design** (`.stat .v`): 18 px.
-- **WPF** (`SoundModeView.xaml:305` etc.): 17.
-- **Fix:** bump to 18.
+- **Done** (`SoundModeView.xaml`): the four stat values (Music / dash / Device / Speed) are `FontSize=18`.
+  Also matched the design's stat **keys** (`.stat .k` 10 px + `letter-spacing: 0.08em`): keys bumped
+  9→10 px, and since WPF `TextBlock` has no letter-spacing, hair spaces (`&#x200A;`) are inserted
+  between the MUSIC/DEVICE/SPEED letters to fake the tracking (user-approved).
 
 ---
 
@@ -224,12 +228,13 @@ Issues that the user does not want to fix are marked with [SKIP]
 
 ## 10. Rhythm tiles (`SoundModeView.xaml`)
 
-### 10.1 🟢 Active tile missing the focus-ring glow
+### 10.1 🟢 [SKIP] Active tile missing the focus-ring glow
 - **Design** (`.rhythm-tile.active`): active tile gets `box-shadow: 0 0 0 3px rose-soft, 0 2px 10px
   rgba(196,118,138,0.18)` (a soft outer ring + lift).
-- **WPF** (`SoundModeView.xaml:473-482`): active state sets border + background + colors but **no shadow
+- **WPF** (`SoundModeView.xaml`): active state sets border + background + colors but **no shadow
   ring/glow**.
-- **Fix:** add an outer glow (e.g. a sibling shadow border) on the active tile.
+- **Note:** a sibling-border glow was implemented and then **reverted at the user's request** — the
+  user did not like the glow ring on the active tile. Intentional deviation; leave as-is.
 
 ---
 
@@ -341,17 +346,17 @@ Explorer" action and theme persistence both map to existing `OpenTasks.md` items
 - [ ] 6.2 Disabled "+" mode tab — 🟡 [SKIP]
 - (6.3 folded into 13.1 — mode-bar gear button)
 - [ ] 7.1 "Listening to system audio" pill — 🔴 [SKIP]
-- [ ] 7.2 Visualizer height 140 — 🟡
-- [ ] 7.3 Visualizer background gradient — 🟡
-- [ ] 7.4 Visualizer corner radius 14 — 🟡
-- [ ] 7.5 Spectrum bar gradient + radius — 🟡
-- [ ] 7.6 Beat ring = full-bleed border flash — 🟡
-- [ ] 7.7 Idle bobbing dots — 🟢
+- [x] 7.2 Visualizer height 140 — ✅
+- [x] 7.3 Visualizer background gradient — ✅
+- [x] 7.4 Visualizer corner radius 14 — ✅
+- [x] 7.5 Spectrum bar gradient + radius — ✅
+- [x] 7.6 Beat ring = full-bleed border flash — ✅
+- [x] 7.7 Idle bobbing dots — ✅
 - [ ] 8.1 Stat dividers — 🟡 [SKIP]
-- [ ] 8.2 Stats bar radius 12 — 🟢
-- [ ] 8.3 Stat value 18 px — 🟢
+- [x] 8.2 Stats bar radius 12 — ✅
+- [x] 8.3 Stat value 18 px (+ key 10 px / tracking) — ✅
 - [ ] 9.1 Muted/capped slider variant — 🟡 [SKIP]
-- [ ] 10.1 Active rhythm tile glow — 🟢
+- [ ] 10.1 Active rhythm tile glow — 🟢 [SKIP] (implemented then reverted per user)
 - [x] 11.1 Stop button shadow — ✅
 - (12.1 folded into 13.1 — theme Light/Dark/System selector + persist)
 - [ ] 12.2 Card shadow fidelity — 🟢 [SKIP]
