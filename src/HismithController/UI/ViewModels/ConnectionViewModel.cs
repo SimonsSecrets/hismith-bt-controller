@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -16,7 +17,8 @@ public enum ConnectionPhase
     NoDevicesFound,
     Connecting,
     ConnectionFailed,
-    IncompatibleDevice
+    IncompatibleDevice,
+    BluetoothUnavailable
 }
 
 public partial class ConnectionViewModel : ObservableObject
@@ -66,6 +68,7 @@ public partial class ConnectionViewModel : ObservableObject
 
         _discoveryService.DeviceFound += OnDeviceFound;
         _discoveryService.ScanCompleted += OnScanCompleted;
+        _discoveryService.AdapterUnavailable += OnAdapterUnavailable;
     }
 
     [RelayCommand]
@@ -145,6 +148,10 @@ public partial class ConnectionViewModel : ObservableObject
             return;
         }
 
+        // Both steps complete — mark step 2 done so the stepper shows green checks
+        // while the identified product is displayed before handoff.
+        ConnectStep = 3;
+
         // Show the identified product briefly before handing off to the connected view.
         IdentifiedProductName = device.DisplayName;
         await Task.Delay(IdentifiedDisplayDuration);
@@ -190,6 +197,14 @@ public partial class ConnectionViewModel : ObservableObject
         await ScanForDevicesAsync();
     }
 
+    [RelayCommand]
+    private void OpenBluetoothSettings()
+    {
+        // The design's failAdapter shows a "Would open Windows Settings" toast (toast is SKIP, §4.1),
+        // so we open the real Windows Bluetooth settings page instead.
+        Process.Start(new ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true });
+    }
+
     public void Reset()
     {
         _discoveryService.StopScan();
@@ -206,6 +221,14 @@ public partial class ConnectionViewModel : ObservableObject
         Application.Current.Dispatcher.InvokeAsync(() =>
         {
             DiscoveredDevices.Add(device);
+        });
+    }
+
+    private void OnAdapterUnavailable(object? sender, EventArgs e)
+    {
+        Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            Phase = ConnectionPhase.BluetoothUnavailable;
         });
     }
 

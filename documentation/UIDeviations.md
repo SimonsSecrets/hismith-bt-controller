@@ -86,34 +86,31 @@ Issues that the user does not want to fix are marked with [SKIP]
 
 ## 5. Connection screens (`ConnectionView.xaml`)
 
-### 5.1 🔴 Missing "Bluetooth unavailable" (no-adapter) screen
+### 5.1 ✅ "Bluetooth unavailable" (no-adapter) screen — IMPLEMENTED
 - **Design** (`app.jsx` `failAdapter`): a FailCard titled "Bluetooth unavailable" with "Open Settings".
-- **WPF**: `ConnectionPhase` enum has `PreConnect, Scanning, DevicesFound, NoDevicesFound, Connecting,
-  ConnectionFailed, IncompatibleDevice` — no no-adapter phase/screen.
-- **Fix:** add the phase + a FailCard variant (reuse the coral warning illustration).
+- **Done**: added `ConnectionPhase.BluetoothUnavailable` + a coral-warn FailCard in `ConnectionView.xaml`.
+  `IDeviceDiscoveryService` gained an `AdapterUnavailable` event, raised by `BleDeviceDiscoveryService`
+  when the watcher stops with `RadioNotAvailable`; the VM switches to the new phase. "Open Settings"
+  runs `OpenBluetoothSettingsCommand` → `ms-settings:bluetooth` (the §4.1 toast is SKIP). The Settings
+  gear FAB stays visible on this screen.
 
-### 5.2 🟡 Selected device icon disappears (icon box "all pink")
+### 5.2 ✅ Selected device icon turns white — IMPLEMENTED
 - **Design** (`connection.jsx` `.device.selected .icon`): on selection the icon box fills rose and the
   Bluetooth glyph turns **white**.
-- **WPF** (`ConnectionView.xaml:96-103`): the selection `DataTrigger` sets `IconBox.Background` and
-  `BorderBrush` to rose but **never changes the inner `Path` stroke** (stays `RoseBrush`), so the glyph
-  is invisible against the rose fill.
-- **Fix:** add a setter changing the icon `Path` stroke to white when selected.
-  *(Tracked in `OpenTasks.md`.)*
+- **Done** (`ConnectionView.xaml`): named the device-row glyph `BtGlyph` and the selection `DataTrigger`
+  now sets its `Stroke` to white, so it reads against the rose-filled icon box.
 
-### 5.3 🟡 Connecting stepper has no "done / green" state
+### 5.3 ✅ Connecting stepper done/green state — IMPLEMENTED
 - **Design** (`connection.jsx` `ConnectingCard`, `.step.done`): each step goes inactive → **active (rose)**
   → **done (sage/green with a check icon)**.
-- **WPF** (`ConnectionView.xaml:396-487`): steps only toggle inactive ↔ active (rose). No completed/green
-  state and no check glyph.
-- **Fix:** add a "done" visual (sage circle + check) keyed off `ConnectStep`.
-  *(Tracked in `OpenTasks.md`.)*
+- **Done**: new `StepStateConverter` maps `ConnectStep` to mutually-exclusive `Inactive`/`Active`/`Done`
+  per step; the XAML adds a sage circle + white check `Path` and sage label for `Done`. The VM sets
+  `ConnectStep = 3` after identification so both steps show green checks during the "Identified:" window.
 
-### 5.4 🟢 Spinner style differs
+### 5.4 ✅ Spinner arc style — IMPLEMENTED
 - **Design** (`.spinner`): a smooth ring, `rose-soft` track with a solid rose top arc, spinning.
-- **WPF** (`ConnectionView.xaml:364-385`): a **dashed** ellipse (`StrokeDashArray 4,6`) rotating — reads
-  as dashes, not a clean arc-with-track.
-- **Fix:** template the spinner as a full track ring + a rose arc overlay.
+- **Done** (`ConnectionView.xaml`): replaced the dashed ellipse with a static `RoseSoftBrush` track ring
+  plus a rotating rose 90° arc `Path` overlay (the 0.9s spin storyboard now drives only the arc).
 
 ### 5.5 🟢 [SKIP] Card width
 - **Design**: `.connect-card` `max-width: 520px` (content cap 480).
@@ -329,10 +326,10 @@ Explorer" action and theme persistence both map to existing `OpenTasks.md` items
 - [x] 2.1 First-run welcome overlay (new tagline, no Skip button) — ✅
 - [ ] 3.1 Lost-connection banner (connected state) — 🔴
 - [ ] 4.1 Toast notifications — 🟢 [SKIP]
-- [ ] 5.1 "Bluetooth unavailable" screen — 🔴
-- [ ] 5.2 Selected device icon turns white — 🟡
-- [ ] 5.3 Stepper done/green state — 🟡
-- [ ] 5.4 Spinner arc style — 🟢
+- [x] 5.1 "Bluetooth unavailable" screen — ✅
+- [x] 5.2 Selected device icon turns white — ✅
+- [x] 5.3 Stepper done/green state — ✅
+- [x] 5.4 Spinner arc style — ✅
 - [ ] 5.5 Connect-card max width — 🟢 [SKIP]
 - [x] 5.6 Settings gear on connection screens — ✅
 - [ ] 6.1 Mode tab icons — 🟡

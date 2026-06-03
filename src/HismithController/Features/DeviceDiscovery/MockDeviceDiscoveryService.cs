@@ -14,6 +14,11 @@ public sealed class MockDeviceDiscoveryService : IDeviceDiscoveryService
     public event EventHandler<DiscoveredDevice>? DeviceFound;
     public event EventHandler? ScanCompleted;
 
+    // Never raised in mock mode — there is no real radio to fail.
+#pragma warning disable CS0067
+    public event EventHandler? AdapterUnavailable;
+#pragma warning restore CS0067
+
     public async Task StartScanAsync(CancellationToken cancellationToken = default)
     {
         StopScan();

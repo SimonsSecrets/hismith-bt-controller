@@ -13,7 +13,7 @@
         <conv:EnumToVisibilityConverter x:Key="EnumToVis" />
         <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
         <conv:SignalStrengthConverter x:Key="SignalConv" />
-        <conv:StepActiveConverter x:Key="StepActiveConv" />
+        <conv:StepStateConverter x:Key="StepStateConv" />
 
         <!-- Device row template -->
         <DataTemplate DataType="{x:Type svc:DiscoveredDevice}">
@@ -40,7 +40,7 @@
                             BorderBrush="{DynamicResource AppBorderBrush}"
                             BorderThickness="1"
                             Margin="0,0,12,0">
-                        <Path Data="M7 7 L17 17 L12 22 V2 L17 7 L7 17"
+                        <Path x:Name="BtGlyph" Data="M7 7 L17 17 L12 22 V2 L17 7 L7 17"
                               Stroke="{DynamicResource RoseBrush}" StrokeThickness="1.6"
                               StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                               Width="16" Height="16" Stretch="Uniform"
@@ -101,6 +101,8 @@
                             Value="{DynamicResource RoseBrush}" />
                     <Setter TargetName="IconBox" Property="BorderBrush"
                             Value="{DynamicResource RoseBrush}" />
+                    <!-- Glyph turns white so it reads against the rose-filled icon box (design: .device.selected .icon). -->
+                    <Setter TargetName="BtGlyph" Property="Stroke" Value="White" />
                     <Setter TargetName="TapHint" Property="Text" Value="&#x2713;" />
                     <Setter TargetName="TapHint" Property="Foreground"
                             Value="{DynamicResource RoseBrush}" />
@@ -360,29 +362,31 @@
                     BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
                     Padding="40,40,40,28" ClipToBounds="True">
                 <StackPanel HorizontalAlignment="Center">
-                    <!-- Spinner -->
-                    <Ellipse Width="36" Height="36" Margin="0,0,0,14"
-                             Stroke="{DynamicResource RoseSoftBrush}" StrokeThickness="3"
-                             HorizontalAlignment="Center"
-                             RenderTransformOrigin="0.5,0.5">
-                        <Ellipse.StrokeDashArray>
-                            <DoubleCollection>4,6</DoubleCollection>
-                        </Ellipse.StrokeDashArray>
-                        <Ellipse.RenderTransform>
-                            <RotateTransform />
-                        </Ellipse.RenderTransform>
-                        <Ellipse.Triggers>
-                            <EventTrigger RoutedEvent="Loaded">
-                                <BeginStoryboard>
-                                    <Storyboard RepeatBehavior="Forever">
-                                        <DoubleAnimation
-                                            Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                                            From="0" To="360" Duration="0:0:0.9" />
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                        </Ellipse.Triggers>
-                    </Ellipse>
+                    <!-- Spinner: a static rose-soft track ring with a rose 90° arc rotating over it
+                         (design .spinner: 3px rose-soft border, border-top-color rose, spin 0.9s). -->
+                    <Grid Width="36" Height="36" Margin="0,0,0,14" HorizontalAlignment="Center">
+                        <Ellipse Stroke="{DynamicResource RoseSoftBrush}" StrokeThickness="3" />
+                        <!-- 90° arc from top to the 3-o'clock point; radius 16.5 = 18 - 3/2 keeps the 3px stroke inside 36px. -->
+                        <Path Data="M 18,1.5 A 16.5,16.5 0 0 1 34.5,18"
+                              Stroke="{DynamicResource RoseBrush}" StrokeThickness="3"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              RenderTransformOrigin="0.5,0.5">
+                            <Path.RenderTransform>
+                                <RotateTransform />
+                            </Path.RenderTransform>
+                            <Path.Triggers>
+                                <EventTrigger RoutedEvent="Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <DoubleAnimation
+                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                From="0" To="360" Duration="0:0:0.9" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Path.Triggers>
+                        </Path>
+                    </Grid>
 
                     <TextBlock Style="{StaticResource HeaderText}" HorizontalAlignment="Center">
                         <TextBlock.Text>
@@ -401,26 +405,50 @@
                                 <Border.Style>
                                     <Style TargetType="Border" BasedOn="{StaticResource StepCircle}">
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=1}" Value="True">
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=1}" Value="Active">
                                                 <Setter Property="Background" Value="{DynamicResource RoseTintBrush}" />
                                                 <Setter Property="BorderBrush" Value="{DynamicResource RoseBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=1}" Value="Done">
+                                                <Setter Property="Background" Value="{DynamicResource SageBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource SageBrush}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <TextBlock Text="1" FontSize="10" FontWeight="SemiBold"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=1}" Value="True">
-                                                    <Setter Property="Foreground" Value="{DynamicResource RoseBrush}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
+                                <Grid>
+                                    <TextBlock Text="1" FontSize="10" FontWeight="SemiBold"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=1}" Value="Active">
+                                                        <Setter Property="Foreground" Value="{DynamicResource RoseBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=1}" Value="Done">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <Path Data="M5 12 L10 17 L18 7" Stroke="White" StrokeThickness="2"
+                                          StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Width="11" Height="11" Stretch="Uniform"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Visibility="Collapsed">
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=1}" Value="Done">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Path.Style>
+                                    </Path>
+                                </Grid>
                             </Border>
                             <TextBlock Text="Establishing connection" FontSize="12"
                                        VerticalAlignment="Center">
@@ -428,8 +456,11 @@
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=1}" Value="True">
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=1}" Value="Active">
                                                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=1}" Value="Done">
+                                                <Setter Property="Foreground" Value="{DynamicResource SageBrush}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -442,26 +473,50 @@
                                 <Border.Style>
                                     <Style TargetType="Border" BasedOn="{StaticResource StepCircle}">
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=2}" Value="True">
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=2}" Value="Active">
                                                 <Setter Property="Background" Value="{DynamicResource RoseTintBrush}" />
                                                 <Setter Property="BorderBrush" Value="{DynamicResource RoseBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=2}" Value="Done">
+                                                <Setter Property="Background" Value="{DynamicResource SageBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource SageBrush}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <TextBlock Text="2" FontSize="10" FontWeight="SemiBold"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=2}" Value="True">
-                                                    <Setter Property="Foreground" Value="{DynamicResource RoseBrush}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
+                                <Grid>
+                                    <TextBlock Text="2" FontSize="10" FontWeight="SemiBold"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=2}" Value="Active">
+                                                        <Setter Property="Foreground" Value="{DynamicResource RoseBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=2}" Value="Done">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <Path Data="M5 12 L10 17 L18 7" Stroke="White" StrokeThickness="2"
+                                          StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Width="11" Height="11" Stretch="Uniform"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Visibility="Collapsed">
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=2}" Value="Done">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Path.Style>
+                                    </Path>
+                                </Grid>
                             </Border>
                             <TextBlock Text="Verifying device compatibility" FontSize="12"
                                        VerticalAlignment="Center">
@@ -469,8 +524,11 @@
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepActiveConv}, ConverterParameter=2}" Value="True">
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=2}" Value="Active">
                                                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectStep, Converter={StaticResource StepStateConv}, ConverterParameter=2}" Value="Done">
+                                                <Setter Property="Foreground" Value="{DynamicResource SageBrush}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -553,6 +611,39 @@
                     <Button Style="{StaticResource PrimaryButton}"
                             Content="Go back" MinWidth="140"
                             Command="{Binding GoBackCommand}"
+                            HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ==================== BLUETOOTH UNAVAILABLE (no adapter) ==================== -->
+        <Grid Visibility="{Binding Phase, Converter={StaticResource EnumToVis}, ConverterParameter=BluetoothUnavailable}">
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="0" BlurRadius="28" Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                </Border.Effect>
+            </Border>
+            <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                    Padding="40,40,40,28" ClipToBounds="True">
+                <StackPanel HorizontalAlignment="Center">
+                    <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
+                        <Ellipse Fill="{DynamicResource CoralTintBrush}" />
+                        <Path Data="M12 4 L22 20 H2 Z M12 10 V15 M12 18 V18.5"
+                              Stroke="{DynamicResource CoralBrush}" StrokeThickness="1.5"
+                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Width="28" Height="28" Stretch="Uniform"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <TextBlock Text="Bluetooth unavailable" Style="{StaticResource HeaderText}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Style="{StaticResource BodyText}"
+                               TextAlignment="Center" Margin="0,8,0,22">
+                        Bluetooth isn't available on this device. Please check your Bluetooth settings.
+                    </TextBlock>
+                    <Button Style="{StaticResource PrimaryButton}"
+                            Content="Open Settings" MinWidth="140"
+                            Command="{Binding OpenBluetoothSettingsCommand}"
                             HorizontalAlignment="Center" />
                 </StackPanel>
             </Border>

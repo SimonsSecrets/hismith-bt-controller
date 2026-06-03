@@ -18,6 +18,7 @@ public sealed class BleDeviceDiscoveryService : IDeviceDiscoveryService
 
     public event EventHandler<DiscoveredDevice>? DeviceFound;
     public event EventHandler? ScanCompleted;
+    public event EventHandler? AdapterUnavailable;
 
     public BleDeviceDiscoveryService(ILogger<BleDeviceDiscoveryService> logger)
     {
@@ -102,6 +103,7 @@ public sealed class BleDeviceDiscoveryService : IDeviceDiscoveryService
         {
             _logger.LogError("Bluetooth radio is not available — cannot scan for devices");
             _scanCts?.Cancel();
+            AdapterUnavailable?.Invoke(this, EventArgs.Empty);
         }
     }
 
