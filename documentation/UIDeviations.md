@@ -129,12 +129,13 @@ Issues that the user does not want to fix are marked with [SKIP]
 
 ## 6. Mode bar (`ConnectedView.xaml`)
 
-### 6.1 🟡 Mode tabs have no icons
+### 6.1 ✅ Mode tab icons — IMPLEMENTED
 - **Design** (`app.jsx` `ModeStrip`): Manual tab has a gear/settings icon, Sound tab has a music-note
   icon (13 px, before the label).
-- **WPF** (`ConnectedView.xaml:148-157`): text-only "Manual" / "Sound" tabs.
-- **Fix:** add the leading icons.
-  *(Tracked in `OpenTasks.md` as "Mode navigation icons".)*
+- **Done** (`ConnectedView.xaml`): each `ModeTab` RadioButton now wraps a horizontal `StackPanel` with a
+  14 px leading vector `Path` (gear for Manual, music-note for Sound) + label. The icon `Stroke` binds to
+  the tab's `Foreground` via `AncestorType=RadioButton`, so it recolours to white alongside the label when
+  the tab is active (same pattern as the Settings `SegButton`).
 
 ### 6.2 🟡 [SKIP] Missing disabled "+" (more modes) tab
 - **Design** (`app.jsx` `ModeStrip`): a third disabled tab with a "+" icon, tooltip "More modes coming
@@ -234,11 +235,15 @@ Issues that the user does not want to fix are marked with [SKIP]
 
 ## 11. Footer (`ConnectedView.xaml`)
 
-### 11.1 🟢 Stop button missing drop shadow
+### 11.1 ✅ Stop button drop shadow — IMPLEMENTED
 - **Design** (`.btn.stop`): `box-shadow: 0 4px 14px rgba(0,0,0,0.28)` (and a sage-tinted shadow when
   flashed).
-- **WPF** (`SharedStyles.xaml:117-183`): no drop shadow on the stop button.
-- **Fix:** add a two-layer shadow under the stop button (per the WPF shadow rule).
+- **Done** (`SharedStyles.xaml` `StopButton`): added two empty blurred sibling Borders carrying the
+  shadow (WPF shadow rule, so the label/icon stay sharp) — a black halo (`ShadowLayer`, ShadowDepth 4 /
+  Direction 270 / BlurRadius 14 / Opacity 0.28, matching the CSS `0 4px 14px rgba(0,0,0,0.28)`) and a
+  sage halo (`SageShadowLayer`, `#7FA688` @ 0.4). The flash storyboards crossfade black→sage in/out
+  alongside the existing `IsStopFlashing` `FlashBg` animation, and the disabled trigger hides the shadow
+  (`box-shadow: none`).
 
 ---
 
@@ -250,7 +255,7 @@ Issues that the user does not want to fix are marked with [SKIP]
   theme dictionary, `System` resolves via `UISettings` and follows the OS live through
   `ColorValuesChanged`, and `UserPreferences.Theme` is saved/loaded in `user-settings.json`.
 
-### 12.2 🟢 Card shadow fidelity
+### 12.2 🟢 [SKIP] Card shadow fidelity
 - **Design** (`--shadow-card`): a layered shadow (`0 1px 2px …04`, `0 8px 28px …06`).
 - **WPF**: single `DropShadowEffect` with `CardShadowOpacity=0.1`. Approximation only — revisit if cards
   look too heavy/light vs. the mock.
@@ -332,7 +337,7 @@ Explorer" action and theme persistence both map to existing `OpenTasks.md` items
 - [x] 5.4 Spinner arc style — ✅
 - [ ] 5.5 Connect-card max width — 🟢 [SKIP]
 - [x] 5.6 Settings gear on connection screens — ✅
-- [ ] 6.1 Mode tab icons — 🟡
+- [x] 6.1 Mode tab icons — ✅
 - [ ] 6.2 Disabled "+" mode tab — 🟡 [SKIP]
 - (6.3 folded into 13.1 — mode-bar gear button)
 - [ ] 7.1 "Listening to system audio" pill — 🔴 [SKIP]
@@ -347,8 +352,8 @@ Explorer" action and theme persistence both map to existing `OpenTasks.md` items
 - [ ] 8.3 Stat value 18 px — 🟢
 - [ ] 9.1 Muted/capped slider variant — 🟡 [SKIP]
 - [ ] 10.1 Active rhythm tile glow — 🟢
-- [ ] 11.1 Stop button shadow — 🟢
+- [x] 11.1 Stop button shadow — ✅
 - (12.1 folded into 13.1 — theme Light/Dark/System selector + persist)
-- [ ] 12.2 Card shadow fidelity — 🟢
+- [ ] 12.2 Card shadow fidelity — 🟢 [SKIP]
 - [x] 13.1 Settings feature — screen (Appearance / Data folder / About / Ko-fi) + mode-bar gear (6.3)
       + theme selector relocation & persistence (12.1); pairs with 5.6 — ✅

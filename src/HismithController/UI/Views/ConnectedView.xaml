@@ -133,12 +133,31 @@
                             <RadioButton Style="{StaticResource ModeTab}"
                                          IsChecked="{Binding ActiveMode, Converter={StaticResource StringEqualConverter}, ConverterParameter=Manual}"
                                          Command="{Binding SwitchModeCommand}" CommandParameter="Manual">
-                                <TextBlock Text="Manual" />
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- Gear icon (design "settings"); stroke binds to the tab Foreground
+                                         so it turns white alongside the label when the tab is active. -->
+                                    <Path Data="M12 9 a3 3 0 1 0 0 6 a3 3 0 1 0 0 -6 M19.4 15 a1.7 1.7 0 0 0 .3 1.8 l.1 .1 a2 2 0 1 1 -2.8 2.8 l-.1 -.1 a1.7 1.7 0 0 0 -1.8 -.3 1.7 1.7 0 0 0 -1 1.5 V21 a2 2 0 1 1 -4 0 v-.1 a1.7 1.7 0 0 0 -1 -1.5 1.7 1.7 0 0 0 -1.8 .3 l-.1 .1 a2 2 0 1 1 -2.8 -2.8 l.1 -.1 a1.7 1.7 0 0 0 .3 -1.8 1.7 1.7 0 0 0 -1.5 -1 H3 a2 2 0 1 1 0 -4 h.1 a1.7 1.7 0 0 0 1.5 -1 1.7 1.7 0 0 0 -.3 -1.8 l-.1 -.1 a2 2 0 1 1 2.8 -2.8 l.1 .1 a1.7 1.7 0 0 0 1.8 .3 H9 a1.7 1.7 0 0 0 1 -1.5 V3 a2 2 0 1 1 4 0 v.1 a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8 -.3 l.1 -.1 a2 2 0 1 1 2.8 2.8 l-.1 .1 a1.7 1.7 0 0 0 -.3 1.8 V9 a1.7 1.7 0 0 0 1.5 1 H21 a2 2 0 1 1 0 4 h-.1 a1.7 1.7 0 0 0 -1.5 1 z"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                          StrokeThickness="1.7" Fill="Transparent" StrokeLineJoin="Round"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Width="14" Height="14" Stretch="Uniform"
+                                          VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBlock Text="Manual" VerticalAlignment="Center" />
+                                </StackPanel>
                             </RadioButton>
                             <RadioButton Style="{StaticResource ModeTab}"
                                          IsChecked="{Binding ActiveMode, Converter={StaticResource StringEqualConverter}, ConverterParameter=Sound}"
                                          Command="{Binding SwitchModeCommand}" CommandParameter="Sound">
-                                <TextBlock Text="Sound" />
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- Music-note icon (design "music"); same Foreground binding for active recolour. -->
+                                    <Path Data="M9 18 V5 L19 3 V16 M5 18 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M15 16 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                          StrokeThickness="1.7" Fill="Transparent" StrokeLineJoin="Round"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Width="14" Height="14" Stretch="Uniform"
+                                          VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBlock Text="Sound" VerticalAlignment="Center" />
+                                </StackPanel>
                             </RadioButton>
                         </StackPanel>
                     </Border>

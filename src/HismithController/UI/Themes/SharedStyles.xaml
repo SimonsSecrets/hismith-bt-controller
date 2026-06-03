@@ -125,6 +125,29 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Grid>
+                        <!-- Shadow layers: empty blurred siblings so the label/icon stay sharp
+                             (WPF shadow rule). Direction=270 = straight down to match the design's
+                             CSS `0 4px 14px` offset. The black shadow shows normally and crossfades
+                             to the sage-tinted shadow while flashing; the opaque content Borders below
+                             cover their bodies, leaving only the blurred halo visible. -->
+                        <Border x:Name="ShadowLayer"
+                                Background="{DynamicResource StopButtonBrush}"
+                                CornerRadius="12">
+                            <Border.Effect>
+                                <DropShadowEffect ShadowDepth="4" Direction="270" BlurRadius="14"
+                                                  Color="Black" Opacity="0.28" />
+                            </Border.Effect>
+                        </Border>
+                        <Border x:Name="SageShadowLayer"
+                                Background="{DynamicResource SageBrush}"
+                                CornerRadius="12"
+                                Opacity="0"
+                                IsHitTestVisible="False">
+                            <Border.Effect>
+                                <DropShadowEffect ShadowDepth="4" Direction="270" BlurRadius="14"
+                                                  Color="#7FA688" Opacity="0.4" />
+                            </Border.Effect>
+                        </Border>
                         <Border x:Name="Bg"
                                 Background="{DynamicResource StopButtonBrush}"
                                 CornerRadius="12"
@@ -155,12 +178,21 @@
                                     Value="{DynamicResource StopButtonDisabledBrush}" />
                             <Setter Property="Foreground"
                                     Value="{DynamicResource StopButtonDisabledForegroundBrush}" />
+                            <!-- Design: disabled stop button has `box-shadow: none`. -->
+                            <Setter TargetName="ShadowLayer" Property="Opacity" Value="0" />
                         </Trigger>
                         <DataTrigger Binding="{Binding IsStopFlashing}" Value="True">
                             <DataTrigger.EnterActions>
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetName="FlashBg"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1" Duration="0:0:0.16" />
+                                        <!-- Crossfade the halo black → sage to mirror `.btn.stop.flashed`. -->
+                                        <DoubleAnimation Storyboard.TargetName="ShadowLayer"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0" Duration="0:0:0.16" />
+                                        <DoubleAnimation Storyboard.TargetName="SageShadowLayer"
                                                          Storyboard.TargetProperty="Opacity"
                                                          To="1" Duration="0:0:0.16" />
                                     </Storyboard>
@@ -170,6 +202,12 @@
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetName="FlashBg"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0" Duration="0:0:0.4" />
+                                        <DoubleAnimation Storyboard.TargetName="ShadowLayer"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1" Duration="0:0:0.4" />
+                                        <DoubleAnimation Storyboard.TargetName="SageShadowLayer"
                                                          Storyboard.TargetProperty="Opacity"
                                                          To="0" Duration="0:0:0.4" />
                                     </Storyboard>
