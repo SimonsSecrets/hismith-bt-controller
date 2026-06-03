@@ -13,6 +13,11 @@
     <Color x:Key="SurfaceSoftColor">#FBF3F0</Color>
     <SolidColorBrush x:Key="SurfaceSoftBrush" Color="{StaticResource SurfaceSoftColor}" />
 
+    <!-- Elevated surface for popovers: matches the white surface in light mode (the popup already
+         separates from the off-white background via its shadow). See DarkTheme for the dark value. -->
+    <Color x:Key="PopoverSurfaceColor">#FFFFFF</Color>
+    <SolidColorBrush x:Key="PopoverSurfaceBrush" Color="{StaticResource PopoverSurfaceColor}" />
+
     <!-- Slider thumb: white knob, matching the design (.slider thumb background #fff). -->
     <Color x:Key="SliderThumbColor">#FFFFFF</Color>
     <SolidColorBrush x:Key="SliderThumbBrush" Color="{StaticResource SliderThumbColor}" />

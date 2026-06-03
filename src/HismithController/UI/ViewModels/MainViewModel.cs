@@ -115,11 +115,28 @@ public partial class MainViewModel : ObservableObject
         _prefsStore.Update(p => p.HasSeenWelcome = true);
     }
 
+    // When the Popup (StaysOpen="False") auto-closes on an outside click, that same click on the
+    // chip button then fires TogglePopover. Without a guard it would immediately reopen, so a
+    // click while the popover is open never appears to close it. Record the close time and
+    // suppress a reopen that lands within the click's settling window.
+    private DateTime _popoverClosedAt = DateTime.MinValue;
+
+    partial void OnIsPopoverOpenChanged(bool value)
+    {
+        if (!value)
+            _popoverClosedAt = DateTime.UtcNow;
+    }
+
     [RelayCommand]
     private void TogglePopover()
     {
-        if (ChipState == ChipState.Connected)
-            IsPopoverOpen = !IsPopoverOpen;
+        if (ChipState != ChipState.Connected)
+            return;
+
+        if (!IsPopoverOpen && DateTime.UtcNow - _popoverClosedAt < TimeSpan.FromMilliseconds(250))
+            return; // Popover was just dismissed by this same click; leave it closed.
+
+        IsPopoverOpen = !IsPopoverOpen;
     }
 
     [RelayCommand]
