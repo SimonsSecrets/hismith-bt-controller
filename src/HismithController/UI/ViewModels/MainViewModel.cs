@@ -42,6 +42,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPopoverOpen;
 
+    // App-level: when true the Settings screen overlays the whole window (replacing the
+    // mode/connection content and hiding the footer), matching the design. Opened from the
+    // connected mode-bar gear and the connection-screen FAB; both share this one flag.
+    [ObservableProperty]
+    private bool _isSettingsOpen;
+
     [ObservableProperty]
     private string _activeMode = "Manual";
 
@@ -54,18 +60,23 @@ public partial class MainViewModel : ObservableObject
     public ConnectionViewModel ConnectionViewModel => _connectionViewModel;
     public ManualModeViewModel ManualModeViewModel { get; }
 
+    // Exposed so the app-level Settings overlay (MainWindow.xaml) can bind its content.
+    public SettingsViewModel SettingsViewModel { get; }
+
     public MainViewModel(
         IBleDeviceService bleService,
         IConnectedDeviceService connectedDevice,
         ConnectionViewModel connectionViewModel,
         ManualModeViewModel manualModeViewModel,
-        SoundModeViewModel soundModeViewModel)
+        SoundModeViewModel soundModeViewModel,
+        SettingsViewModel settingsViewModel)
     {
         _bleService = bleService;
         _connectedDevice = connectedDevice;
         _connectionViewModel = connectionViewModel;
         ManualModeViewModel = manualModeViewModel;
         _soundModeViewModel = soundModeViewModel;
+        SettingsViewModel = settingsViewModel;
         _currentView = connectionViewModel;
 
         _connectionViewModel.Connected += OnDeviceConnected;
@@ -79,12 +90,10 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ToggleTheme()
-    {
-        IsDarkTheme = !IsDarkTheme;
-        if (Application.Current is App app)
-            app.ApplyTheme(IsDarkTheme);
-    }
+    private void OpenSettings() => IsSettingsOpen = true;
+
+    [RelayCommand]
+    private void CloseSettings() => IsSettingsOpen = false;
 
     [RelayCommand]
     private void TogglePopover()

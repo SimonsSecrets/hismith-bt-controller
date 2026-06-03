@@ -65,4 +65,30 @@ public class UserPreferencesStoreTests : IDisposable
 
         Assert.Equal(240, new UserPreferencesStore(_path).Load().MaxBpm);
     }
+
+    [Fact]
+    public void ThemePreference_RoundTripsByName()
+    {
+        var store = new UserPreferencesStore(_path);
+        store.Save(new UserPreferences { Theme = ThemePreference.Dark });
+
+        Assert.Equal(ThemePreference.Dark, store.Load().Theme);
+        // Name, not numeric value — same rationale as the rhythm enum.
+        Assert.Contains("Dark", File.ReadAllText(_path));
+    }
+
+    [Fact]
+    public void Update_PreservesFieldsOwnedByOtherWriters()
+    {
+        var store = new UserPreferencesStore(_path);
+        // Sound Mode writes its two fields...
+        store.Update(p => { p.SelectedRhythm = ThrustRhythm.EveryTwoBeats; p.MaxBpm = 120; });
+        // ...then the Settings screen writes only the theme.
+        store.Update(p => p.Theme = ThemePreference.Light);
+
+        var loaded = store.Load();
+        Assert.Equal(ThrustRhythm.EveryTwoBeats, loaded.SelectedRhythm);
+        Assert.Equal(120, loaded.MaxBpm);
+        Assert.Equal(ThemePreference.Light, loaded.Theme);
+    }
 }

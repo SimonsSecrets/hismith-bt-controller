@@ -557,5 +557,57 @@
                 </StackPanel>
             </Border>
         </Grid>
+
+        <!-- Settings gear FAB (top-right inside the card frame). Opens the app-level Settings
+             overlay via the window-level command. Hidden while scanning/connecting, per design. -->
+        <Button HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,18,18,0"
+                Cursor="Hand" ToolTip="Settings"
+                Command="{Binding DataContext.OpenSettingsCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+            <Button.Style>
+                <Style TargetType="Button">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Phase}" Value="Scanning">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Phase}" Value="Connecting">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Button.Style>
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <Grid Width="38" Height="38" Background="Transparent">
+                        <!-- Shadow layer -->
+                        <Border CornerRadius="999" Background="{DynamicResource SurfaceBrush}">
+                            <Border.Effect>
+                                <DropShadowEffect ShadowDepth="2" BlurRadius="8"
+                                                  Color="{DynamicResource CardShadowColor}" Opacity="{DynamicResource CardShadowOpacity}" />
+                            </Border.Effect>
+                        </Border>
+                        <!-- Content layer -->
+                        <Border x:Name="GearBg" CornerRadius="999"
+                                Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource AppBorderBrush}"
+                                BorderThickness="1">
+                            <Path Data="M12 9 a3 3 0 1 0 0 6 a3 3 0 1 0 0 -6 M19.4 15 a1.7 1.7 0 0 0 .3 1.8 l.1 .1 a2 2 0 1 1 -2.8 2.8 l-.1 -.1 a1.7 1.7 0 0 0 -1.8 -.3 1.7 1.7 0 0 0 -1 1.5 V21 a2 2 0 1 1 -4 0 v-.1 a1.7 1.7 0 0 0 -1 -1.5 1.7 1.7 0 0 0 -1.8 .3 l-.1 .1 a2 2 0 1 1 -2.8 -2.8 l.1 -.1 a1.7 1.7 0 0 0 .3 -1.8 1.7 1.7 0 0 0 -1.5 -1 H3 a2 2 0 1 1 0 -4 h.1 a1.7 1.7 0 0 0 1.5 -1 1.7 1.7 0 0 0 -.3 -1.8 l-.1 -.1 a2 2 0 1 1 2.8 -2.8 l.1 .1 a1.7 1.7 0 0 0 1.8 .3 H9 a1.7 1.7 0 0 0 1 -1.5 V3 a2 2 0 1 1 4 0 v.1 a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8 -.3 l.1 -.1 a2 2 0 1 1 2.8 2.8 l-.1 .1 a1.7 1.7 0 0 0 -.3 1.8 V9 a1.7 1.7 0 0 0 1.5 1 H21 a2 2 0 1 1 0 4 h-.1 a1.7 1.7 0 0 0 -1.5 1 z"
+                                  Stroke="{DynamicResource TextBrush}" StrokeThickness="1.6"
+                                  StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Width="18" Height="18" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="GearBg" Property="Background"
+                                    Value="{DynamicResource SurfaceSoftBrush}" />
+                            <Setter TargetName="GearBg" Property="BorderBrush"
+                                    Value="{DynamicResource BorderStrongBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Button.Template>
+        </Button>
     </Grid>
 </UserControl>

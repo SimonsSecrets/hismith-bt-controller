@@ -75,10 +75,10 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Theme toggle (left) -->
+                <!-- Settings gear (left) — opens the app-level Settings overlay -->
                 <Button Grid.Column="0" HorizontalAlignment="Left"
-                        Command="{Binding ToggleThemeCommand}" Cursor="Hand"
-                        ToolTip="Toggle theme">
+                        Command="{Binding OpenSettingsCommand}" Cursor="Hand"
+                        ToolTip="Settings">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Grid Width="38" Height="38" Background="Transparent">
@@ -91,39 +91,24 @@
                                     </Border.Effect>
                                 </Border>
                                 <!-- Content layer -->
-                                <Border x:Name="ToggleBg" CornerRadius="999"
+                                <Border x:Name="GearBg" CornerRadius="999"
                                         Background="{DynamicResource SurfaceBrush}"
                                         BorderBrush="{DynamicResource AppBorderBrush}"
                                         BorderThickness="1">
-                                    <Grid>
-                                        <!-- Sun icon (light mode) -->
-                                        <Path x:Name="SunIcon"
-                                              Data="M12 12 m-4 0 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 M12 2 V4 M12 20 V22 M4.93 4.93 L6.34 6.34 M17.66 17.66 L19.07 19.07 M2 12 H4 M20 12 H22 M4.93 19.07 L6.34 17.66 M17.66 6.34 L19.07 4.93"
-                                              Stroke="{DynamicResource TextBrush}" StrokeThickness="1.6"
-                                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                              Width="16" Height="16" Stretch="Uniform"
-                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        <!-- Moon icon (dark mode) -->
-                                        <Path x:Name="MoonIcon" Visibility="Collapsed"
-                                              Data="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
-                                              Stroke="{DynamicResource TextBrush}" StrokeThickness="1.6" Fill="Transparent"
-                                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                              Width="16" Height="16" Stretch="Uniform"
-                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Grid>
+                                    <Path Data="M12 9 a3 3 0 1 0 0 6 a3 3 0 1 0 0 -6 M19.4 15 a1.7 1.7 0 0 0 .3 1.8 l.1 .1 a2 2 0 1 1 -2.8 2.8 l-.1 -.1 a1.7 1.7 0 0 0 -1.8 -.3 1.7 1.7 0 0 0 -1 1.5 V21 a2 2 0 1 1 -4 0 v-.1 a1.7 1.7 0 0 0 -1 -1.5 1.7 1.7 0 0 0 -1.8 .3 l-.1 .1 a2 2 0 1 1 -2.8 -2.8 l.1 -.1 a1.7 1.7 0 0 0 .3 -1.8 1.7 1.7 0 0 0 -1.5 -1 H3 a2 2 0 1 1 0 -4 h.1 a1.7 1.7 0 0 0 1.5 -1 1.7 1.7 0 0 0 -.3 -1.8 l-.1 -.1 a2 2 0 1 1 2.8 -2.8 l.1 .1 a1.7 1.7 0 0 0 1.8 .3 H9 a1.7 1.7 0 0 0 1 -1.5 V3 a2 2 0 1 1 4 0 v.1 a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8 -.3 l.1 -.1 a2 2 0 1 1 2.8 2.8 l-.1 .1 a1.7 1.7 0 0 0 -.3 1.8 V9 a1.7 1.7 0 0 0 1.5 1 H21 a2 2 0 1 1 0 4 h-.1 a1.7 1.7 0 0 0 -1.5 1 z"
+                                          Stroke="{DynamicResource TextBrush}" StrokeThickness="1.6"
+                                          StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Width="17" Height="17" Stretch="Uniform"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                             </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="ToggleBg" Property="Background"
+                                    <Setter TargetName="GearBg" Property="Background"
                                             Value="{DynamicResource SurfaceSoftBrush}" />
-                                    <Setter TargetName="ToggleBg" Property="BorderBrush"
+                                    <Setter TargetName="GearBg" Property="BorderBrush"
                                             Value="{DynamicResource BorderStrongBrush}" />
                                 </Trigger>
-                                <DataTrigger Binding="{Binding IsDarkTheme}" Value="True">
-                                    <Setter TargetName="SunIcon" Property="Visibility" Value="Collapsed" />
-                                    <Setter TargetName="MoonIcon" Property="Visibility" Value="Visible" />
-                                </DataTrigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Button.Template>

@@ -10,4 +10,7 @@ public sealed class UserPreferences
 
     // Sound Mode device-speed cap; 240 = uncapped (full scale).
     public int MaxBpm { get; set; } = 240;
+
+    // Appearance. Defaults to System (follow the OS) for a first run with no saved file.
+    public ThemePreference Theme { get; set; } = ThemePreference.System;
 }

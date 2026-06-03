@@ -17,6 +17,14 @@ public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
 
+    // Kept alive for the process lifetime so its ColorValuesChanged event keeps firing
+    // (a local would be collected). Used both to detect the OS theme and to follow it live
+    // while the user's preference is System.
+    private global::Windows.UI.ViewManagement.UISettings? _uiSettings;
+
+    // The active appearance choice. Drives whether ColorValuesChanged re-applies the theme.
+    private ThemePreference _themePreference = ThemePreference.System;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -80,14 +88,20 @@ public partial class App : Application
         settings.UseMockBle = mockBle;
         settings.UseMockAudio = mockAudio;
 
+        // Resolve the user-editable data folder up front so the logger and preferences store
+        // share one location for the whole process (a folder change applies after a restart).
+        var appDataPaths = new AppDataPaths();
+
         var services = new ServiceCollection();
         services.AddLogging(builder =>
         {
             builder.AddDebug();
-            builder.AddProvider(new FileLoggerProvider(FileLoggerProvider.DefaultLogDirectory));
+            builder.AddProvider(new FileLoggerProvider(appDataPaths.LogsFolder));
         });
         services.AddSingleton(settings);
-        services.AddSingleton<UserPreferencesStore>();
+        services.AddSingleton(appDataPaths);
+        services.AddSingleton(sp =>
+            new UserPreferencesStore(sp.GetRequiredService<AppDataPaths>().UserSettingsPath));
 
         if (mockBle)
         {
@@ -110,12 +124,15 @@ public partial class App : Application
         services.AddSingleton<ConnectionViewModel>();
         services.AddSingleton<ManualModeViewModel>();
         services.AddSingleton<SoundModeViewModel>();
+        services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 
         _serviceProvider = services.BuildServiceProvider();
 
-        DetectSystemTheme();
+        // Apply the persisted appearance choice (defaults to System on first run).
+        var prefs = _serviceProvider.GetRequiredService<UserPreferencesStore>().Load();
+        ApplyThemePreference(prefs.Theme);
 
         var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
         mainWindow.Show();
@@ -130,27 +147,65 @@ public partial class App : Application
                 UriKind.Relative)
         };
         Resources.MergedDictionaries[0] = dict;
+
+        var vm = _serviceProvider?.GetService<MainViewModel>();
+        if (vm is not null)
+            vm.IsDarkTheme = isDark;
     }
 
-    private void DetectSystemTheme()
+    // Applies a Light/Dark/System choice and arms live OS-theme following for System.
+    // Called at startup and whenever the user changes the segmented control in Settings.
+    public void ApplyThemePreference(ThemePreference preference)
     {
+        _themePreference = preference;
+
+        bool isDark = preference switch
+        {
+            ThemePreference.Light => false,
+            ThemePreference.Dark => true,
+            _ => IsSystemDark()   // System
+        };
+        ApplyTheme(isDark);
+
+        EnsureSystemThemeWatcher();
+    }
+
+    // Subscribes once to the OS color-scheme change so a System preference tracks the OS
+    // live. The handler no-ops unless the current preference is still System.
+    private void EnsureSystemThemeWatcher()
+    {
+        if (_uiSettings is not null)
+            return;
+
         try
         {
-            var uiSettings = new global::Windows.UI.ViewManagement.UISettings();
-            var bg = uiSettings.GetColorValue(global::Windows.UI.ViewManagement.UIColorType.Background);
-            bool systemIsDark = bg.R < 128;
-
-            if (systemIsDark)
+            _uiSettings = new global::Windows.UI.ViewManagement.UISettings();
+            _uiSettings.ColorValuesChanged += (_, _) =>
             {
-                ApplyTheme(true);
-                var vm = _serviceProvider?.GetService<MainViewModel>();
-                if (vm is not null)
-                    vm.IsDarkTheme = true;
-            }
+                if (_themePreference != ThemePreference.System)
+                    return;
+                // ColorValuesChanged fires on a background thread; touch WPF resources on the UI thread.
+                Dispatcher.InvokeAsync(() => ApplyTheme(IsSystemDark()));
+            };
         }
         catch
         {
-            // Fallback to light theme
+            // UISettings unavailable (rare) → System resolves to light and won't live-update.
+        }
+    }
+
+    private bool IsSystemDark()
+    {
+        try
+        {
+            _uiSettings ??= new global::Windows.UI.ViewManagement.UISettings();
+            var bg = _uiSettings.GetColorValue(global::Windows.UI.ViewManagement.UIColorType.Background);
+            // A dark background colour ⇒ the OS is in dark mode.
+            return bg.R < 128;
+        }
+        catch
+        {
+            return false;   // default to light if the OS query fails
         }
     }
 

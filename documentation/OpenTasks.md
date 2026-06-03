@@ -9,8 +9,6 @@ Ai agents may however mark tasks completed if they detect that they have complet
 
 - [ ] Device scanning: Fix icon for selected device (it is all pink, not showing the icon)
 - [ ] Connection flow: Visual step indicators should move from light rose (not active) to dark rose (executing) to green (completed)
-- [ ] Settings menu with a button to open the logs/crashdump location
-- [ ] Save selected color theme
 - [ ] Mode navigation icons
 - [ ] Manual mode: pause upon entering tab, manual activation required
 
@@ -18,3 +16,5 @@ Ai agents may however mark tasks completed if they detect that they have complet
 
 - [x] Manual Mode: visual beat indicator
 - [x] Manual Mode: better names for preset (more suited to the application)
+- [x] Settings menu with a button to open the logs/crashdump location (Settings → Application data → "Open in Explorer" opens the data folder, which contains the logs)
+- [x] Save selected color theme (Settings → Appearance Light/Dark/System, persisted in user-settings.json)

@@ -300,8 +300,10 @@ public partial class SoundModeViewModel : ObservableObject
         SavePreferences();
     }
 
+    // Update only this mode's fields via load-modify-save so the Settings screen's Theme
+    // (a separate writer of the same file) isn't clobbered by a full-object Save.
     private void SavePreferences()
-        => _prefsStore.Save(new UserPreferences { SelectedRhythm = SelectedRhythm, MaxBpm = MaxBpm });
+        => _prefsStore.Update(p => { p.SelectedRhythm = SelectedRhythm; p.MaxBpm = MaxBpm; });
 
     // Called by the global emergency stop. Disables device driving so no further
     // BPM is sent until the user opts back in; the bound play/pause button flips

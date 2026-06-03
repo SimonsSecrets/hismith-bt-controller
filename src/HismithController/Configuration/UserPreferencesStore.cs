@@ -65,4 +65,14 @@ public sealed class UserPreferencesStore
             // Best-effort; a settings write must never crash the app.
         }
     }
+
+    // Load-modify-save so independent writers (Sound Mode's rhythm/cap vs. the Settings
+    // screen's theme) only touch their own fields and don't clobber each other's by
+    // serializing a partially-populated object.
+    public void Update(Action<UserPreferences> mutate)
+    {
+        var prefs = Load();
+        mutate(prefs);
+        Save(prefs);
+    }
 }

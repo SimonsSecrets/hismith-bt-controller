@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:HismithController.ViewModels"
         xmlns:views="clr-namespace:HismithController.Views"
+        xmlns:conv="clr-namespace:HismithController.Converters"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
@@ -14,6 +15,8 @@
         PreviewKeyDown="OnPreviewKeyDown">
 
     <Window.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+
         <!-- When CurrentView is a ConnectionViewModel, show ConnectionView -->
         <DataTemplate DataType="{x:Type vm:ConnectionViewModel}">
             <views:ConnectionView />
@@ -25,5 +28,14 @@
         </DataTemplate>
     </Window.Resources>
 
-    <ContentControl Content="{Binding CurrentView}" />
+    <Grid>
+        <ContentControl Content="{Binding CurrentView}" />
+
+        <!-- App-level Settings overlay: covers the whole window (including the footer) when
+             open, matching the design where Settings replaces the app-main content. -->
+        <views:SettingsView DataContext="{Binding SettingsViewModel}"
+                            Visibility="{Binding DataContext.IsSettingsOpen,
+                                         RelativeSource={RelativeSource AncestorType=Window},
+                                         Converter={StaticResource BoolToVis}}" />
+    </Grid>
 </Window>

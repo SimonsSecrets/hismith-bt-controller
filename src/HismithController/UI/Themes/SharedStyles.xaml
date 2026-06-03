@@ -223,6 +223,145 @@
         </Setter>
     </Style>
 
+    <!-- ==================== SETTINGS: SEGMENTED CONTROL (theme) ==================== -->
+    <!-- RadioButtons styled as pills inside a rounded track (see SettingsView). The active
+         pill fills rose with white content; the icon Path binds to the control Foreground so
+         it recolours to white alongside the label. (The design's subtle active-pill glow is
+         omitted: a DropShadowEffect on a text-bearing element blurs the text — see the WPF
+         shadow rule in CLAUDE.md.) -->
+    <Style x:Key="SegButton" TargetType="RadioButton">
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="Margin" Value="1,0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <!-- Explicit half-height radius (height 30 ⇒ 15) gives a clean capsule,
+                         matching the ModeTab pill; an over-large value can render oval. -->
+                    <Border x:Name="Bg" Background="Transparent" CornerRadius="15"
+                            Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bg" Property="Background"
+                                    Value="{DynamicResource RoseBrush}" />
+                            <Setter Property="Foreground" Value="White" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ==================== SETTINGS: KO-FI BUTTON ==================== -->
+    <!-- Fixed brand colours (#FF5E5B), not theme tokens. Two-layer shadow (empty sibling
+         Border carries the DropShadow) so the label/icon stay sharp per the WPF shadow rule. -->
+    <Style x:Key="KofiButton" TargetType="Button">
+        <Setter Property="Height" Value="46" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <!-- Shadow layer: empty, blurred -->
+                        <Border CornerRadius="9" Background="#FF5E5B" Margin="0,2,0,0">
+                            <Border.Effect>
+                                <DropShadowEffect ShadowDepth="4" BlurRadius="14"
+                                                  Color="#FF5E5B" Opacity="0.32" />
+                            </Border.Effect>
+                        </Border>
+                        <!-- Content layer: sharp text -->
+                        <Border x:Name="Bg" CornerRadius="9" Background="#FF5E5B">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="#F5514E" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ==================== SETTINGS: ICON BUTTON (header back, etc.) ==================== -->
+    <!-- 34px square, 9px radius — the design's .icon-btn. -->
+    <Style x:Key="IconButton" TargetType="Button">
+        <Setter Property="Width" Value="34" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bg" CornerRadius="9"
+                            Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource AppBorderBrush}"
+                            BorderThickness="1">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bg" Property="Background"
+                                    Value="{DynamicResource SurfaceSoftBrush}" />
+                            <Setter TargetName="Bg" Property="BorderBrush"
+                                    Value="{DynamicResource BorderStrongBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ==================== SETTINGS: SMALL BUTTONS (data-folder actions) ==================== -->
+    <!-- .btn.sm — h34, sized to content. Ghost (bordered) + subtle (borderless) variants. -->
+    <Style x:Key="GhostButtonSmall" BasedOn="{StaticResource GhostButton}" TargetType="Button">
+        <Setter Property="Height" Value="34" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="FontSize" Value="12.5" />
+    </Style>
+
+    <!-- .btn.subtle.sm — rose-soft fill + rose-dark content, hover rose-tint. -->
+    <Style x:Key="SubtleButtonSmall" TargetType="Button">
+        <Setter Property="Height" Value="34" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{DynamicResource RoseDarkBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bg" Background="{DynamicResource RoseSoftBrush}" CornerRadius="9"
+                            Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bg" Property="Background"
+                                    Value="{DynamicResource RoseTintBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ==================== DEVICE ROW ==================== -->
 
     <Style x:Key="DeviceRow" TargetType="Border">

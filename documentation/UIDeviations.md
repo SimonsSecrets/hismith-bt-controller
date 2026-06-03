@@ -115,13 +115,13 @@ Issues that the user does not want to fix are marked with [SKIP]
 - **WPF** (`ConnectionView.xaml:116`): hard `Width=480 MaxWidth=480`.
 - **Fix:** confirm intended max width (likely fine, but the design card is up to 520).
 
-### 5.6 🟡 Missing Settings gear on connection screens
+### 5.6 ✅ Settings gear on connection screens — IMPLEMENTED
 - **Design** (`app.jsx` `.settings-fab`, `index.html:944`): a 38 px round gear button pinned top-right
   (`top:18 right:18`) inside the card frame on the pre-connect, devices-found, empty, and fail screens
   (hidden during scanning/connecting). Opens the Settings screen (§13).
-- **WPF** (`ConnectionView.xaml`): no settings gear on any connection screen (only the mock-only
-  "Skip to connected (debug)" button).
-- **Fix:** add the top-right gear FAB to the relevant phases, wired to open Settings.
+- **Done** (`ConnectionView.xaml`): top-right 38 px gear FAB added as the last child of the centred
+  card frame, hidden via `Phase` DataTriggers during Scanning/Connecting, wired to the window-level
+  `OpenSettingsCommand`. (Done together with §13.1.)
 
 ---
 
@@ -140,10 +140,10 @@ Issues that the user does not want to fix are marked with [SKIP]
 - **WPF**: only two tabs; no "+" placeholder.
 - **Fix:** add a disabled third tab with a plus glyph.
 
-### 6.3 🟡 Mode-bar left button should be a Settings gear, not a theme toggle
+### 6.3 ✅ Mode-bar left button is now a Settings gear — IMPLEMENTED
 - The design's mode-bar left slot is now a **Settings gear** (not a theme toggle), and theme switching
-  has moved into the Settings screen. **Tracked as part of the consolidated Settings item — see §13.1
-  (part B).**
+  has moved into the Settings screen. **Done as part of §13.1 (part B):** `ConnectedView.xaml`'s left
+  slot is a gear bound to `OpenSettingsCommand`; the old sun/moon `ToggleThemeCommand` button is gone.
 
 ---
 
@@ -242,10 +242,11 @@ Issues that the user does not want to fix are marked with [SKIP]
 
 ## 12. Theming
 
-### 12.1 🟡 Theme: no Light/Dark/System selector, not persisted
+### 12.1 ✅ Theme: Light/Dark/System selector + persistence — IMPLEMENTED
 - The 3-way **Light / Dark / System** theme control now lives on the Settings screen, and the choice
-  must persist between sessions. **Tracked as part of the consolidated Settings item — see §13.1
-  (part C).** *(Persistence also tracked in `OpenTasks.md` as "Save selected color theme".)*
+  persists between sessions. **Done as part of §13.1 (part C):** `App.ApplyThemePreference` swaps the
+  theme dictionary, `System` resolves via `UISettings` and follows the OS live through
+  `ColorValuesChanged`, and `UserPreferences.Theme` is saved/loaded in `user-settings.json`.
 
 ### 12.2 🟢 Card shadow fidelity
 - **Design** (`--shadow-card`): a layered shadow (`0 1px 2px …04`, `0 8px 28px …06`).
@@ -256,11 +257,25 @@ Issues that the user does not want to fix are marked with [SKIP]
 
 ## 13. Settings screen & theme relocation (NEW in latest design)
 
-### 13.1 🔴 Settings feature not implemented (consolidated)
+### 13.1 ✅ Settings feature — IMPLEMENTED (consolidated)
 > **Single tracked item.** This bundles the new Settings screen with the two changes that only make
 > sense alongside it: the mode-bar gear button (was §6.3) and the relocation of theme switching into
 > Settings (was §12.1). Ship them together. The connection-screen Settings gear (§5.6) is the same
 > entry point and is best done in the same pass.
+>
+> **Done (all parts A/B/C + §5.6):** `UI/Views/SettingsView.xaml` (+ `SettingsViewModel`) is shown
+> as an app-level overlay in `MainWindow.xaml` (visible on `MainViewModel.IsSettingsOpen`), covering
+> both connection and connected content and the footer. The connected mode-bar's left slot is now a
+> Settings gear (`ConnectedView.xaml`, `OpenSettingsCommand`); the connection screens have the
+> top-right gear FAB (`ConnectionView.xaml`, hidden during Scanning/Connecting). Theme is a
+> Light/Dark/System segmented control wired to `App.ApplyThemePreference` with live OS-follow for
+> System (`UISettings.ColorValuesChanged`) and persisted in `user-settings.json` via
+> `UserPreferences.Theme`. The data folder is user-editable (`Configuration/AppDataPaths.cs`, fixed
+> `%LOCALAPPDATA%` pointer file + migrate-and-restart on change); "Open in Explorer" opens it.
+> Version reads from the assembly (`<Version>0.1.0</Version>`).
+>
+> Minor design deviation: the segmented control's active-pill glow is omitted (a `DropShadowEffect`
+> on a text-bearing element blurs the text — see the WPF shadow rule in CLAUDE.md).
 
 **Part A — The Settings screen itself**
 - **Design** (`settings.jsx` `SettingsScreen`, `index.html:956`): a full-window view that **replaces
@@ -314,7 +329,7 @@ Explorer" action and theme persistence both map to existing `OpenTasks.md` items
 - [ ] 5.3 Stepper done/green state — 🟡
 - [ ] 5.4 Spinner arc style — 🟢
 - [ ] 5.5 Connect-card max width — 🟢 [SKIP]
-- [ ] 5.6 Settings gear on connection screens — 🟡
+- [x] 5.6 Settings gear on connection screens — ✅
 - [ ] 6.1 Mode tab icons — 🟡
 - [ ] 6.2 Disabled "+" mode tab — 🟡 [SKIP]
 - (6.3 folded into 13.1 — mode-bar gear button)
@@ -333,5 +348,5 @@ Explorer" action and theme persistence both map to existing `OpenTasks.md` items
 - [ ] 11.1 Stop button shadow — 🟢
 - (12.1 folded into 13.1 — theme Light/Dark/System selector + persist)
 - [ ] 12.2 Card shadow fidelity — 🟢
-- [ ] 13.1 Settings feature — screen (Appearance / Data folder / About / Ko-fi) + mode-bar gear (6.3)
-      + theme selector relocation & persistence (12.1); pairs with 5.6 — 🔴
+- [x] 13.1 Settings feature — screen (Appearance / Data folder / About / Ko-fi) + mode-bar gear (6.3)
+      + theme selector relocation & persistence (12.1); pairs with 5.6 — ✅
