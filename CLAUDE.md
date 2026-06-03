@@ -2,6 +2,10 @@
 
 Windows WPF app: captures system audio → detects beats in real-time → controls Hismith BLE device speed.
 
+## Claude - Important
+
+See 'CLAUDE_GENERAL_GUIDELINES.md' for general behavioral guidelines when working in this project.
+
 ## Architecture
 
 Three subsystems wired by C# events in `MainWindow`:
