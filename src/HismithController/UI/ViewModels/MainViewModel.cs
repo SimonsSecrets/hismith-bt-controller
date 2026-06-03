@@ -3,6 +3,7 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HismithController.Bluetooth;
+using HismithController.Configuration;
 using HismithController.Devices;
 
 namespace HismithController.ViewModels;
@@ -22,6 +23,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IConnectedDeviceService _connectedDevice;
     private readonly ConnectionViewModel _connectionViewModel;
     private readonly SoundModeViewModel _soundModeViewModel;
+    private readonly UserPreferencesStore _prefsStore;
     private DispatcherTimer? _stopFlashTimer;
 
     [ObservableProperty]
@@ -48,6 +50,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isSettingsOpen;
 
+    // App-level first-run welcome overlay (UIDeviations §2.1). Shown once over everything on the
+    // first launch; "Get started" dismisses it and persists the flag so it never reappears.
+    [ObservableProperty]
+    private bool _isWelcomeOpen;
+
     [ObservableProperty]
     private string _activeMode = "Manual";
 
@@ -69,7 +76,8 @@ public partial class MainViewModel : ObservableObject
         ConnectionViewModel connectionViewModel,
         ManualModeViewModel manualModeViewModel,
         SoundModeViewModel soundModeViewModel,
-        SettingsViewModel settingsViewModel)
+        SettingsViewModel settingsViewModel,
+        UserPreferencesStore prefsStore)
     {
         _bleService = bleService;
         _connectedDevice = connectedDevice;
@@ -77,7 +85,11 @@ public partial class MainViewModel : ObservableObject
         ManualModeViewModel = manualModeViewModel;
         _soundModeViewModel = soundModeViewModel;
         SettingsViewModel = settingsViewModel;
+        _prefsStore = prefsStore;
         _currentView = connectionViewModel;
+
+        // Gate the welcome overlay on the persisted first-run flag.
+        _isWelcomeOpen = !prefsStore.Load().HasSeenWelcome;
 
         _connectionViewModel.Connected += OnDeviceConnected;
         _connectionViewModel.PropertyChanged += (_, e) =>
@@ -94,6 +106,14 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void CloseSettings() => IsSettingsOpen = false;
+
+    [RelayCommand]
+    private void DismissWelcome()
+    {
+        IsWelcomeOpen = false;
+        // Load-modify-save so the Sound Mode / theme fields in the same file are untouched.
+        _prefsStore.Update(p => p.HasSeenWelcome = true);
+    }
 
     [RelayCommand]
     private void TogglePopover()

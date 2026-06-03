@@ -102,6 +102,10 @@
     <Color x:Key="LogoGradientMid">#E0A07F</Color>
     <Color x:Key="LogoGradientEnd">#E0BB7A</Color>
 
+    <!-- Modal overlay scrim (design overlay-back token: rgba(0,0,0,0.6)) -->
+    <Color x:Key="OverlayBackColor">#99000000</Color>
+    <SolidColorBrush x:Key="OverlayBackBrush" Color="{StaticResource OverlayBackColor}" />
+
     <!-- Shadow -->
     <Color x:Key="CardShadowColor">#73000000</Color>
     <Color x:Key="PopoverShadowColor">#99000000</Color>

@@ -48,13 +48,18 @@ Issues that the user does not want to fix are marked with [SKIP]
 
 ## 2. First-run welcome overlay
 
-### 2.1 🔴 Welcome overlay not implemented
+### 2.1 ✅ Welcome overlay — IMPLEMENTED
 - **Design** (`app.jsx` `Welcome`, `index.html:844` `.welcome`): a modal overlay with blurred backdrop,
   gradient logo tile, "HismithController" heading, tagline "Explore, experiment, enjoy", three numbered
   step cards (Connect / Choose a mode / Play), and a single "Get started" button.
   *(Updated design: tagline changed from "Move to the beat." and the "Skip" button was removed.)*
-- **WPF**: no equivalent anywhere.
-- **Fix:** build the overlay as a full-window layer gated on a first-run flag.
+- **Done** (`UI/Views/WelcomeView.xaml`): full-window scrim (`OverlayBackBrush` token) + centred card
+  (gradient logo, heading, tagline, three step cards, "Get started" with a soft rose glow), mounted
+  last in `MainWindow.xaml` so it paints over everything. The content layers behind it are blurred
+  via a `BlurEffect` (design's `backdrop-filter: blur`), keyed off `IsWelcomeOpen`. Gated on
+  `MainViewModel.IsWelcomeOpen`, seeded from the persisted `UserPreferences.HasSeenWelcome` first-run
+  flag; "Get started" runs `DismissWelcomeCommand`, which hides the overlay and saves the flag
+  (`user-settings.json`) so it never reappears.
 
 ---
 
@@ -321,7 +326,7 @@ Explorer" action and theme persistence both map to existing `OpenTasks.md` items
 
 - [ ] 1.1 Custom title bar (logo + window buttons) — 🔴 [SKIP]
 - [ ] 1.2 Fixed size + rounded corners + window shadow — 🟡 [SKIP]
-- [ ] 2.1 First-run welcome overlay (new tagline, no Skip button) — 🔴
+- [x] 2.1 First-run welcome overlay (new tagline, no Skip button) — ✅
 - [ ] 3.1 Lost-connection banner (connected state) — 🔴
 - [ ] 4.1 Toast notifications — 🟢 [SKIP]
 - [ ] 5.1 "Bluetooth unavailable" screen — 🔴

@@ -288,7 +288,7 @@
                             <StackPanel>
                                 <TextBlock Text="Enjoying HismithController?" FontSize="14"
                                            FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
-                                <TextBlock Text="It's built and maintained by one person in their spare time. If you enjoy it, a small tip is much appreciated and keeps it going. ;)"
+                                <TextBlock Text="It's built and maintained by one person in their spare time. If you enjoy it, a small tip is much appreciated and keeps it going ;)"
                                            FontSize="12" Foreground="{DynamicResource TextDimBrush}"
                                            TextWrapping="Wrap" LineHeight="18" Margin="0,6,0,16" />
                                 <Button Style="{StaticResource KofiButton}"

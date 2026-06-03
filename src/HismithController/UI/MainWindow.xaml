@@ -29,13 +29,37 @@
     </Window.Resources>
 
     <Grid>
-        <ContentControl Content="{Binding CurrentView}" />
+        <!-- Content layers. Blurred out of focus while the first-run welcome overlay is open
+             (design .welcome backdrop-filter blur), so the welcome card reads as the focal point.
+             The welcome overlay itself sits outside this Grid and stays sharp. -->
+        <Grid>
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsWelcomeOpen}" Value="True">
+                            <Setter Property="Effect">
+                                <Setter.Value>
+                                    <BlurEffect Radius="20" KernelType="Gaussian" />
+                                </Setter.Value>
+                            </Setter>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
 
-        <!-- App-level Settings overlay: covers the whole window (including the footer) when
-             open, matching the design where Settings replaces the app-main content. -->
-        <views:SettingsView DataContext="{Binding SettingsViewModel}"
-                            Visibility="{Binding DataContext.IsSettingsOpen,
-                                         RelativeSource={RelativeSource AncestorType=Window},
-                                         Converter={StaticResource BoolToVis}}" />
+            <ContentControl Content="{Binding CurrentView}" />
+
+            <!-- App-level Settings overlay: covers the whole window (including the footer) when
+                 open, matching the design where Settings replaces the app-main content. -->
+            <views:SettingsView DataContext="{Binding SettingsViewModel}"
+                                Visibility="{Binding DataContext.IsSettingsOpen,
+                                             RelativeSource={RelativeSource AncestorType=Window},
+                                             Converter={StaticResource BoolToVis}}" />
+        </Grid>
+
+        <!-- First-run welcome overlay (UIDeviations §2.1): mounted last so it paints over
+             everything, including the Settings overlay. DataContext inherits from the Window
+             (MainViewModel), so the "Get started" button binds to DismissWelcomeCommand. -->
+        <views:WelcomeView Visibility="{Binding IsWelcomeOpen, Converter={StaticResource BoolToVis}}" />
     </Grid>
 </Window>

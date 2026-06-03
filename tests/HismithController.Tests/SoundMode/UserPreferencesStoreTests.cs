@@ -78,6 +78,22 @@ public class UserPreferencesStoreTests : IDisposable
     }
 
     [Fact]
+    public void HasSeenWelcome_DefaultsToFalseOnMissingFile()
+    {
+        // A fresh install (no file) must show the welcome overlay once.
+        Assert.False(new UserPreferencesStore(_path).Load().HasSeenWelcome);
+    }
+
+    [Fact]
+    public void HasSeenWelcome_RoundTrips()
+    {
+        var store = new UserPreferencesStore(_path);
+        store.Update(p => p.HasSeenWelcome = true);
+
+        Assert.True(store.Load().HasSeenWelcome);
+    }
+
+    [Fact]
     public void Update_PreservesFieldsOwnedByOtherWriters()
     {
         var store = new UserPreferencesStore(_path);
