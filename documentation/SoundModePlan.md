@@ -145,7 +145,7 @@ Approach: **beat-count window, not time window, plus explicit change detection.*
 
 **Goal:** When playing, the detected beats translate to BPM commands sent to the connected Hismith.
 
-### 3.1 Beat-to-BPM mapping
+### 3.1 Beat-to-BPM mapping ✅
 - Add a `BeatToDeviceMapper` class (in `Features/Audio/` or a new `Features/SoundMode/` folder) that:
   - Takes `musicBpm` (from `BpmEstimator`) and emits `deviceBpm` continuously.
   - For Phase 3, with no rhythm divider and no cap, `deviceBpm = clamp(musicBpm, 0, device.MaxBpm)` — **applied directly, no ramping.**
@@ -153,7 +153,7 @@ Approach: **beat-count window, not time window, plus explicit change detection.*
 - **If, and only if, testing reveals the device misbehaves on large legitimate jumps** (e.g. a real track transitions from 70 → 180 BPM and the motor strains audibly), add a coarse safety governor as a *separate* later step — something like "limit slew to 300 BPM/s," which is 4× faster than the Manual ramp and only kicks in on extreme jumps. Capture this as an open question for the Phase 3 verify step rather than building it pre-emptively.
 - Apply the same BLE write throttling pattern as Manual mode: min 50 ms between BLE writes, send on change or every 50 ms.
 
-### 3.2 Wire `SoundModeViewModel` to `IConnectedDeviceService`
+### 3.2 Wire `SoundModeViewModel` to `IConnectedDeviceService` ✅
 - Inject `IConnectedDeviceService` into `SoundModeViewModel`.
 - When `IsDrivingDevice` is true and `HasAudio` is true, push the mapper's output to `device.SetTargetBpmAsync(...)`.
 - When `IsDrivingDevice` flips to false: immediately send `SetTargetBpmAsync(0)`. The visualizer + detector keep running.
@@ -164,11 +164,11 @@ Approach: **beat-count window, not time window, plus explicit change detection.*
   - Hook this off `MainViewModel.ActiveMode` changing away from `"Sound"`. The cleanest seam is to give `SoundModeViewModel` a `Deactivate()` method and call it from `MainViewModel.OnActiveModeChanged` when transitioning out of Sound (mirroring how `InitializeAsync` is called when transitioning in).
 - Listen to global stop (existing `EmergencyStopAsync` in MainViewModel): when invoked, the device is already stopped, but also flip `IsDrivingDevice = false` so we don't immediately re-send a non-zero BPM on the next beat. The user has to press Play again to resume — same comfort principle as tab activation.
 
-### 3.3 Populate the Device / Speed stats
+### 3.3 Populate the Device / Speed stats ✅
 - Bind the "Device" stat to `deviceBpm` and the "Speed" stat to `device.BpmToPercent(deviceBpm)`.
 - Show `—` / `0` when `!IsDrivingDevice || !HasAudio`.
 
-### 3.4 Reconnect / connection-lost handling
+### 3.4 Reconnect / connection-lost handling ✅
 - Reuse the same patterns as Manual mode (`OnBleStatusChanged` → `ChipState.Lost`). When the device disconnects mid-playback, flip `IsDrivingDevice = false` and surface the existing "Connection lost" banner.
 
 ### 3.5 Verify Phase 3

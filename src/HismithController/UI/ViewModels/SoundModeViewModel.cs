@@ -6,16 +6,29 @@ using CommunityToolkit.Mvvm.Input;
 using HismithController.Audio;
 using HismithController.BeatDetection;
 using HismithController.Configuration;
+using HismithController.Devices;
 using HismithController.SoundMode;
 
 namespace HismithController.ViewModels;
 
 public partial class SoundModeViewModel : ObservableObject
 {
-    private readonly IAudioCaptureService _audioService;
-    private readonly SpectrumAnalyzer     _spectrumAnalyzer;
-    private readonly IBeatDetector        _beatDetector;
-    private readonly UserPreferencesStore _prefsStore;
+    private readonly IAudioCaptureService    _audioService;
+    private readonly SpectrumAnalyzer        _spectrumAnalyzer;
+    private readonly IBeatDetector           _beatDetector;
+    private readonly UserPreferencesStore    _prefsStore;
+    private readonly IConnectedDeviceService _connectedDevice;
+
+    // Paces BLE writes while actively driving. Phase 3 sends the mapper output on a
+    // fixed 50 ms cadence (matching Manual mode's BLE floor); each tick writes only
+    // when the target changed, so a steady BPM produces no redundant traffic while a
+    // tempo change reaches the device within one tick. Runs on the UI thread.
+    private const int BleWriteIntervalMs = 50;
+    private readonly DispatcherTimer _bleWriteTimer;
+
+    // Last device BPM handed to SetTargetBpmAsync. -1 = nothing sent yet, so the
+    // first stop still emits an explicit 0. Read/written only on the UI thread.
+    private int _lastSentBpm = -1;
 
     // Debounces persistence of SelectedRhythm/MaxBpm: the cap slider fires many
     // changes per drag, so we coalesce writes to one ~400 ms after the last change
@@ -114,10 +127,14 @@ public partial class SoundModeViewModel : ObservableObject
     // driving — matches the design, where the device columns read 0 while paused/silent.
     public int DeviceBpm => IsActivelyDriving ? BeatToDeviceMapper.Map(LiveBpm, SelectedRhythm, MaxBpm) : 0;
 
-    // Device speed as a percentage of the fixed 240 BPM full-scale. Uses the same 240
-    // reference as modes.jsx rather than IDevice.BpmToPercent — the device dependency
-    // belongs to Phase 3.
-    public int DeviceSpeedPercent => IsActivelyDriving ? (int)Math.Round(DeviceBpm / (double)FullScaleBpm * 100) : 0;
+    // Device speed as a percentage (§3.3). Uses the connected device's own BpmToPercent
+    // so the readout matches what the hardware actually receives (e.g. a 100-BPM-max
+    // Mini reports 100 % at 100 BPM, not 42 %). Falls back to the design's fixed 240
+    // full-scale when no device is connected (mock-less preview / paused-no-device).
+    public int DeviceSpeedPercent =>
+        !IsActivelyDriving ? 0
+        : _connectedDevice.CurrentDevice is { } device ? device.BpmToPercent(DeviceBpm)
+        : (int)Math.Round(DeviceBpm / (double)FullScaleBpm * 100);
 
     // User-set ceiling on the device BPM (post-ratio). 240 = uncapped (slider maximum).
     [ObservableProperty]
@@ -167,19 +184,24 @@ public partial class SoundModeViewModel : ObservableObject
         new(Enumerable.Range(0, 56).Select(_ => new SpectrumBin()));
 
     public SoundModeViewModel(
-        IAudioCaptureService audioService,
-        SpectrumAnalyzer     spectrumAnalyzer,
-        IBeatDetector        beatDetector,
-        UserPreferencesStore prefsStore)
+        IAudioCaptureService    audioService,
+        SpectrumAnalyzer        spectrumAnalyzer,
+        IBeatDetector           beatDetector,
+        UserPreferencesStore    prefsStore,
+        IConnectedDeviceService connectedDevice)
     {
         _audioService     = audioService;
         _spectrumAnalyzer = spectrumAnalyzer;
         _beatDetector     = beatDetector;
         _prefsStore       = prefsStore;
+        _connectedDevice  = connectedDevice;
 
         _audioService.StateChanged         += OnCaptureStateChanged;
         _spectrumAnalyzer.SpectrumUpdated  += OnSpectrumUpdated;
         _beatDetector.BeatDetected         += OnBeatDetected;
+
+        _bleWriteTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(BleWriteIntervalMs) };
+        _bleWriteTimer.Tick += OnBleWriteTimerTick;
 
         _beatTickTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
         _beatTickTimer.Tick += OnBeatTickTimerTick;
@@ -300,13 +322,59 @@ public partial class SoundModeViewModel : ObservableObject
         }
 
         UpdatePulseTimer();
+        UpdateDeviceDriving();
     }
 
     // LiveBpm changed → re-pace the pulse so the ring/dot keep tracking the readout.
     partial void OnLiveBpmChanged(int value) => UpdatePulseTimer();
 
-    // Audio came or went → start/stop the pulse alongside the driving gate.
-    partial void OnHasAudioChanged(bool value) => UpdatePulseTimer();
+    // Audio came or went → start/stop the pulse and the device-send loop alongside
+    // the driving gate (HasAudio is half of IsActivelyDriving).
+    partial void OnHasAudioChanged(bool value)
+    {
+        UpdatePulseTimer();
+        UpdateDeviceDriving();
+    }
+
+    // ── Device driving (§3.1 / §3.2) ───────────────────────────────────────────
+
+    // Starts or stops the 50 ms BLE write loop to match IsActivelyDriving. On the
+    // rising edge it pushes the first value immediately (no 50 ms wait); on the
+    // falling edge it releases the device with an immediate 0 (PushDeviceBpm sends
+    // DeviceBpm, which is 0 once not actively driving) and stops the loop.
+    private void UpdateDeviceDriving()
+    {
+        if (IsActivelyDriving)
+        {
+            if (!_bleWriteTimer.IsEnabled)
+            {
+                _bleWriteTimer.Start();
+                PushDeviceBpm();
+            }
+        }
+        else
+        {
+            _bleWriteTimer.Stop();
+            PushDeviceBpm();   // DeviceBpm == 0 here → immediate stop command
+        }
+    }
+
+    private void OnBleWriteTimerTick(object? sender, EventArgs e) => PushDeviceBpm();
+
+    // Writes the current mapper output to the device, but only when it changed since
+    // the last write (so a steady tempo produces no redundant BLE traffic). The cap
+    // to the device's physical max happens inside SetTargetBpmAsync. Direct-apply,
+    // no ramp (§3.1): the BpmEstimator already smooths the music BPM upstream.
+    private void PushDeviceBpm()
+    {
+        if (_connectedDevice.CurrentDevice is not { } device) return;
+
+        int target = DeviceBpm;   // 0 whenever !IsActivelyDriving
+        if (target == _lastSentBpm) return;
+
+        _lastSentBpm = target;
+        _ = device.SetTargetBpmAsync(target);
+    }
 
     // (Re)starts or stops the BPM-driven pulse timer to match the current state.
     // Pulses only while actively driving (device-driving enabled + audio) and a

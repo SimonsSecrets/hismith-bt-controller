@@ -198,6 +198,11 @@ public partial class MainViewModel : ObservableObject
             if (status.State == BleConnectionState.Disconnected && IsConnected)
             {
                 ChipState = ChipState.Lost;
+                // Release Sound Mode so it stops trying to drive a device that is gone:
+                // flip IsDrivingDevice off (no further BPM until the user re-engages),
+                // mirroring Manual mode's behaviour. The "Connection lost" banner is the
+                // ChipState.Lost surface above.
+                _soundModeViewModel.ForceStop();
             }
         });
     }
