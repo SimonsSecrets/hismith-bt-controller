@@ -13,6 +13,10 @@
     <Color x:Key="SurfaceSoftColor">#FBF3F0</Color>
     <SolidColorBrush x:Key="SurfaceSoftBrush" Color="{StaticResource SurfaceSoftColor}" />
 
+    <!-- Slider thumb: white knob, matching the design (.slider thumb background #fff). -->
+    <Color x:Key="SliderThumbColor">#FFFFFF</Color>
+    <SolidColorBrush x:Key="SliderThumbBrush" Color="{StaticResource SliderThumbColor}" />
+
     <!-- Visualizer background gradient (design viz-bg-top / viz-bg-bot tokens) -->
     <Color x:Key="VizBgTopColor">#FBEFF3</Color>
     <Color x:Key="VizBgBotColor">#FFF7F0</Color>

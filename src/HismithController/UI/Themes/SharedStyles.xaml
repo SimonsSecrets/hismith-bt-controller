@@ -470,15 +470,15 @@
                 <ControlTemplate TargetType="Thumb">
                     <Grid>
                         <!-- Shadow layer -->
-                        <Ellipse Fill="{DynamicResource SurfaceBrush}">
+                        <Ellipse Fill="{DynamicResource SliderThumbBrush}">
                             <Ellipse.Effect>
                                 <DropShadowEffect ShadowDepth="0" BlurRadius="6"
                                                   Color="#4E2828" Opacity="0.35" />
                             </Ellipse.Effect>
                         </Ellipse>
-                        <!-- Face layer -->
+                        <!-- Face layer: light knob in both themes (design uses a white knob). -->
                         <Ellipse x:Name="Face"
-                                 Fill="{DynamicResource SurfaceBrush}"
+                                 Fill="{DynamicResource SliderThumbBrush}"
                                  Stroke="{DynamicResource RoseBrush}"
                                  StrokeThickness="2" />
                     </Grid>

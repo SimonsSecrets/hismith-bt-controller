@@ -13,6 +13,11 @@
     <Color x:Key="SurfaceSoftColor">#2D2229</Color>
     <SolidColorBrush x:Key="SurfaceSoftBrush" Color="{StaticResource SurfaceSoftColor}" />
 
+    <!-- Slider thumb: stays light in dark mode to match the design's white knob (the design
+         files are light-theme only, so dark mode keeps the same light knob over the dark track). -->
+    <Color x:Key="SliderThumbColor">#F5EDE8</Color>
+    <SolidColorBrush x:Key="SliderThumbBrush" Color="{StaticResource SliderThumbColor}" />
+
     <!-- Visualizer background gradient (design viz-bg-top / viz-bg-bot tokens, dark palette) -->
     <Color x:Key="VizBgTopColor">#2A1B23</Color>
     <Color x:Key="VizBgBotColor">#1A1218</Color>
