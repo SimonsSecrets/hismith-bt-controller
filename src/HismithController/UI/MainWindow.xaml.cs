@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using HismithController.ViewModels;
@@ -13,6 +14,17 @@ public partial class MainWindow : Window
         _viewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
+
+        // Tint the native title bar to match the theme. SourceInitialized is the first point the
+        // HWND exists; PropertyChanged re-applies it when the user toggles light/dark live.
+        SourceInitialized += (_, _) => TitleBarTheme.Apply(this, _viewModel.IsDarkTheme);
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.IsDarkTheme))
+            TitleBarTheme.Apply(this, _viewModel.IsDarkTheme);
     }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
