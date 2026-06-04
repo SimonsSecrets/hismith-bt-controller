@@ -112,6 +112,36 @@
         </Setter>
     </Style>
 
+    <!-- ==================== LINK BUTTON ==================== -->
+    <!-- Subtle text link (design .link-btn), e.g. "Continue without connecting": no border/fill,
+         dim text that warms to rose on hover. -->
+    <Style x:Key="LinkButton" TargetType="Button">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bg" Background="Transparent"
+                            CornerRadius="8" Padding="6,4"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bg" Property="Background"
+                                    Value="{DynamicResource RoseSoftBrush}" />
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource RoseBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ==================== STOP BUTTON ==================== -->
 
     <Style x:Key="StopButton" TargetType="Button">

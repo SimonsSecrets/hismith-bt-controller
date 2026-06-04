@@ -43,6 +43,14 @@
                                 </Setter.Value>
                             </Setter>
                         </DataTrigger>
+                        <!-- Same blur behind the demo-notice dialog (design .overlay-back backdrop-filter). -->
+                        <DataTrigger Binding="{Binding IsDemoNoticeOpen}" Value="True">
+                            <Setter Property="Effect">
+                                <Setter.Value>
+                                    <BlurEffect Radius="20" KernelType="Gaussian" />
+                                </Setter.Value>
+                            </Setter>
+                        </DataTrigger>
                     </Style.Triggers>
                 </Style>
             </Grid.Style>
@@ -56,6 +64,11 @@
                                              RelativeSource={RelativeSource AncestorType=Window},
                                              Converter={StaticResource BoolToVis}}" />
         </Grid>
+
+        <!-- Demo-notice dialog overlay ("continue without a device?"): paints over the window
+             content. Mounted before WelcomeView so the first-run welcome still wins if both
+             ever coincide. DataContext inherits the Window (MainViewModel). -->
+        <views:DemoNoticeView Visibility="{Binding IsDemoNoticeOpen, Converter={StaticResource BoolToVis}}" />
 
         <!-- First-run welcome overlay (UIDeviations §2.1): mounted last so it paints over
              everything, including the Settings overlay. DataContext inherits from the Window

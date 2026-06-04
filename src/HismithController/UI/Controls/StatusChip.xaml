@@ -56,6 +56,10 @@
                             <Setter TargetName="StatusDot" Property="Fill"
                                     Value="{DynamicResource SageBrush}" />
                         </DataTrigger>
+                        <DataTrigger Binding="{Binding ChipState}" Value="Demo">
+                            <Setter TargetName="StatusDot" Property="Fill"
+                                    Value="{DynamicResource AmberBrush}" />
+                        </DataTrigger>
                         <DataTrigger Binding="{Binding ChipState}" Value="Lost">
                             <Setter TargetName="StatusDot" Property="Fill"
                                     Value="{DynamicResource CoralBrush}" />
@@ -82,7 +86,42 @@
                 <Border CornerRadius="12" Background="{DynamicResource PopoverSurfaceBrush}"
                         BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
                         Padding="14" Margin="8" ClipToBounds="True">
-                    <StackPanel>
+                    <Grid>
+                    <!-- ===== Demo-mode popover (design app.jsx StatusChip demo branch) ===== -->
+                    <StackPanel Visibility="{Binding ChipState, Converter={StaticResource EnumToVis}, ConverterParameter=Demo}">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <!-- Amber rounded square with monitor glyph -->
+                            <Border Width="36" Height="36" CornerRadius="10"
+                                    Background="{DynamicResource AmberTintBrush}" Margin="0,0,10,0">
+                                <Path Data="M3 4 H21 a1 1 0 0 1 1 1 V15 a1 1 0 0 1 -1 1 H3 a1 1 0 0 1 -1 -1 V5 a1 1 0 0 1 1 -1 M8 21 H16 M12 17 V21"
+                                      Stroke="{DynamicResource AmberBrush}" StrokeThickness="1.7"
+                                      StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Width="18" Height="18" Stretch="Uniform"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Demo mode" FontWeight="SemiBold"
+                                           FontSize="13.5" Foreground="{DynamicResource TextBrush}" />
+                                <TextBlock Text="No device connected" FontSize="11"
+                                           Foreground="{DynamicResource TextDimBrush}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Border BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0"
+                                Padding="0,8,0,12">
+                            <TextBlock Text="You're exploring offline — no signals are sent to any device."
+                                       FontSize="12" Foreground="{DynamicResource TextDimBrush}"
+                                       TextWrapping="Wrap" LineHeight="17" />
+                        </Border>
+
+                        <Button Style="{DynamicResource PrimaryButton}"
+                                Content="Connect a device"
+                                Command="{Binding DisconnectCommand}"
+                                HorizontalAlignment="Stretch" />
+                    </StackPanel>
+
+                    <!-- ===== Connected popover ===== -->
+                    <StackPanel Visibility="{Binding ChipState, Converter={StaticResource EnumToVis}, ConverterParameter=Connected}">
                         <!-- Device info header -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                             <Border Width="36" Height="36" CornerRadius="10"
@@ -128,6 +167,7 @@
                                 Command="{Binding DisconnectCommand}"
                                 HorizontalAlignment="Stretch" />
                     </StackPanel>
+                    </Grid>
                 </Border>
             </Grid>
         </Popup>

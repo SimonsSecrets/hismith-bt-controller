@@ -1,20 +1,32 @@
 using HismithController.Bluetooth;
 using HismithController.Services;
+using Microsoft.Extensions.Logging;
 
 namespace HismithController.Devices;
 
 public sealed class ConnectedDeviceService : IConnectedDeviceService
 {
     private readonly IBleDeviceService _ble;
+    private readonly ILogger<DemoDevice> _demoLogger;
 
-    public ConnectedDeviceService(IBleDeviceService ble)
+    public ConnectedDeviceService(IBleDeviceService ble, ILogger<DemoDevice> demoLogger)
     {
         _ble = ble;
+        _demoLogger = demoLogger;
     }
 
     public IDevice? CurrentDevice { get; private set; }
 
+    public bool IsDemoMode { get; private set; }
+
     public event EventHandler<IDevice?>? DeviceChanged;
+
+    public void EnterDemoMode()
+    {
+        CurrentDevice = HismithDeviceCatalog.CreateDemoDevice(_demoLogger);
+        IsDemoMode = true;
+        DeviceChanged?.Invoke(this, CurrentDevice);
+    }
 
     public Task ConnectAsync(DiscoveredDevice discovered, CancellationToken cancellationToken = default) =>
         _ble.ConnectAsync(discovered, cancellationToken);
@@ -36,6 +48,7 @@ public sealed class ConnectedDeviceService : IConnectedDeviceService
 
     public async Task DisconnectAsync()
     {
+        IsDemoMode = false;
         if (CurrentDevice is not null)
         {
             await CurrentDevice.DisconnectAsync();

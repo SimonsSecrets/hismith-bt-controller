@@ -1,4 +1,5 @@
 using HismithController.Bluetooth;
+using Microsoft.Extensions.Logging;
 
 namespace HismithController.Devices;
 
@@ -76,11 +77,21 @@ public static class HismithDeviceCatalog
         new("Destroyed", 100),
     ];
 
+    // Max BPM for the AK Series (Pro 1); shared by the real catalog entry and the demo device
+    // so both describe the same hardware envelope.
+    public const int Pro1MaxBpm = 240;
+
+    // Demo device: a DemoDevice configured exactly like the AK Series (Pro 1) so every mode
+    // behaves identically, but its BLE writes are no-ops (logged only). Used by the offline
+    // "demo mode" exploration path, which never opens a real BLE link.
+    public static DemoDevice CreateDemoDevice(ILogger<DemoDevice> logger) =>
+        new("Hismith Pro 1 (AK Series) - DEMO", Pro1MaxBpm, Pro1Presets, logger);
+
     public static HismithDevice? CreateForProductCode(ushort productCode, IBleDeviceService ble) =>
         productCode switch
         {
             MockBleDeviceService.ProductCodeAkSeries
-                => new HismithDevice("Hismith Pro 1 (AK Series)", 240, Pro1Presets, ble),
+                => new HismithDevice("Hismith Pro 1 (AK Series)", Pro1MaxBpm, Pro1Presets, ble),
             MockBleDeviceService.ProductCodeMockMini
                 => new HismithDevice("Hismith Mini (mock)", 100, MiniPresets, ble),
             _ => null,

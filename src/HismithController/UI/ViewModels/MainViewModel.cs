@@ -14,6 +14,7 @@ public enum ChipState
     Scanning,
     Connecting,
     Connected,
+    Demo,
     Lost
 }
 
@@ -59,6 +60,15 @@ public partial class MainViewModel : ObservableObject
     // first launch; "Get started" dismisses it and persists the flag so it never reappears.
     [ObservableProperty]
     private bool _isWelcomeOpen;
+
+    // App-level "continue without a device?" warning overlay (design DemoNoticeDialog). Opened
+    // from the pre-connect "Continue without connecting" link; blurs the window content behind it.
+    [ObservableProperty]
+    private bool _isDemoNoticeOpen;
+
+    // True while exploring offline (no device connected). Drives the orange chip + demo popover.
+    [ObservableProperty]
+    private bool _isDemoMode;
 
     [ObservableProperty]
     private string _activeMode = "Manual";
@@ -160,6 +170,35 @@ public partial class MainViewModel : ObservableObject
         _prefsStore.Update(p => p.HasSeenWelcome = true);
     }
 
+    [RelayCommand]
+    private void ShowDemoNotice()
+    {
+        IsDemoNoticeOpen = true;
+    }
+
+    [RelayCommand]
+    private void CancelDemoNotice()
+    {
+        IsDemoNoticeOpen = false;
+    }
+
+    // Confirmed from the demo-notice dialog: enter offline exploration. Mirrors the connected
+    // handoff (OnDeviceConnected) but backed by the no-BLE DemoDevice and flagged as demo.
+    [RelayCommand]
+    private void ConfirmDemoMode()
+    {
+        IsDemoNoticeOpen = false;
+        _connectedDevice.EnterDemoMode();
+        DeviceName = string.Empty;   // demo popover uses fixed copy, not DeviceName
+        IsConnected = true;
+        IsDemoMode = true;
+        ChipState = ChipState.Demo;
+        ActiveMode = "Manual";
+        ActiveModeContent = ManualModeViewModel;
+        _ = ManualModeViewModel.InitializeAsync();
+        CurrentView = this;
+    }
+
     // When the Popup (StaysOpen="False") auto-closes on an outside click, that same click on the
     // chip button then fires TogglePopover. Without a guard it would immediately reopen, so a
     // click while the popover is open never appears to close it. Record the close time and
@@ -175,7 +214,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void TogglePopover()
     {
-        if (ChipState != ChipState.Connected)
+        if (ChipState is not (ChipState.Connected or ChipState.Demo))
             return;
 
         if (!IsPopoverOpen && DateTime.UtcNow - _popoverClosedAt < TimeSpan.FromMilliseconds(250))
@@ -191,6 +230,7 @@ public partial class MainViewModel : ObservableObject
         IsConnectionLost = false;
         await _connectedDevice.DisconnectAsync();
         IsConnected = false;
+        IsDemoMode = false;
         DeviceName = string.Empty;
         ChipState = ChipState.Disconnected;
         _connectionViewModel.Reset();
@@ -279,7 +319,9 @@ public partial class MainViewModel : ObservableObject
         {
             ConnectionPhase.Scanning => ChipState.Scanning,
             ConnectionPhase.Connecting => ChipState.Connecting,
-            _ => IsConnected ? ChipState.Connected : ChipState.Disconnected
+            _ => IsConnected
+                ? (IsDemoMode ? ChipState.Demo : ChipState.Connected)
+                : ChipState.Disconnected
         };
     }
 
@@ -287,7 +329,9 @@ public partial class MainViewModel : ObservableObject
     {
         Application.Current.Dispatcher.InvokeAsync(() =>
         {
-            if (status.State == BleConnectionState.Disconnected && IsConnected)
+            // Demo mode never opened a BLE link, so a stray Disconnected must not raise the
+            // lost-connection banner.
+            if (status.State == BleConnectionState.Disconnected && IsConnected && !IsDemoMode)
             {
                 ChipState = ChipState.Lost;
                 IsConnectionLost = true;
