@@ -17,3 +17,6 @@ Goal: Implement a mechanism to smooth out the tempo change, specifically handlin
 Issue: It seems like the device response is not fully linear to the percentage input.
 Goal: Set up a device calibration curve based on real world measurements (mapping input percentage to observed thrusting tempo).
 
+## 4. Security
+Goal: Scan the whole application for any security concerns/issues and make sure it is trustworthy on other computers.
+When running the application on other computers, i want to avoid that windows flags the app as suspicious or untrusted.

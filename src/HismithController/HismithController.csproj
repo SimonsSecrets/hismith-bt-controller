@@ -7,6 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <Version>0.1.0</Version>
+    <!-- Embedded as the native Win32 icon resource of the exe (Explorer, taskbar). -->
+    <ApplicationIcon>Logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <!-- Release publish: self-contained single-file exe (bundles the .NET runtime).
@@ -34,6 +36,8 @@
 
   <ItemGroup>
     <None Remove="Content\0NU38.jpg" />
+    <!-- Bundled into the assembly so the title-bar/taskbar icon can be set via pack URI. -->
+    <Resource Include="Logo.ico" />
   </ItemGroup>
 
   <ItemGroup>
