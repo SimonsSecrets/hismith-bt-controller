@@ -79,7 +79,7 @@ WASAPI loopback ─► AudioFrame (mono, 44.1 kHz) ─► SpectralFluxBeatDetect
                                                    │
                                                    ├─ per hop (audio thread):  spectral flux ─► onset peak-pick ─► BeatDetected (liveness)
                                                    │                                          └─► append to OSF ring
-                                                   └─ every 500 ms (timer thread): autocorrelation over OSF ─► CurrentBpm / Confidence
+                                                   └─ every 500 ms (timer thread): autocorrelation over OSF ─► TempoSmoother ─► CurrentBpm / Confidence
 ```
 
 Two outputs come out of the detector and they are deliberately **decoupled**:
@@ -272,6 +272,37 @@ musical range (~60–180) **without a hard cap**.
 
 Folding is **currently disabled** (and was always conditional) — see §6.
 
+### 5.6 Output smoothing — `TempoSmoother` (the asymmetric up-jump gate)
+The autocorrelation estimate is **not published directly**. Each 500 ms cycle its result
+is passed through `TempoSmoother` (`Features/BeatDetection/TempoSmoother.cs`) before being
+stored in `CurrentBpm`. This fixes the symptom in OpenPoints §2: when the input tempo
+changes, the recency-weighted autocorrelation briefly latches a spurious *short* lag (the
+decaying old period plus a couple of close transition ticks), so the raw estimate spikes
+**high** for ~0.5–1.5 s. Smoothing at the source keeps that spike out of the readout, the
+beat pulse, and the device alike.
+
+The filter is deliberately **asymmetric**:
+
+- **Decreases and small increases** are adopted immediately. Slowing the source must never
+  be delayed (the device should not keep running fast), and small drift needs no gating.
+- **A large upward jump** — one that clears **both** a relative factor (`> +25 %`) **and**
+  an absolute floor (`> +20 BPM`) — becomes a *pending candidate* and is adopted only after
+  it persists for **3 consecutive cycles** (`TempoUpConfirmCycles`, ≈ 1.5 s). A spike that
+  fades before then is discarded and the previous tempo is held. This is the literal reading
+  of the requirement "large jumps up … need more than two rapid-succession ticks to be
+  applied."
+- **Requiring both** a factor and a floor for "large" avoids gating tiny absolute drift at
+  low BPM (the factor alone would) and small relative wobble at high BPM (the floor alone
+  would). Successive candidates within `TempoConfirmToleranceBpm` (8 BPM) count as confirming
+  the same pending tempo; a reading outside that restarts the count.
+- A reading of **0** (lock lost / silence) passes through and clears any pending candidate;
+  a full **stop/error** calls `Reset()` (wired in `OnAudioStateChanged`) so the next session
+  re-locks from scratch rather than gating against a stale baseline.
+
+The four thresholds are `private const` in `SpectralFluxBeatDetector` (passed into the
+smoother's ctor) — fixed in code, **not** user-configurable, matching the `OnsetMultiplier`
+convention. Guarded by `TempoSmootherTests`.
+
 ---
 
 ## 6. The regime classifier — when to fold (and why it is currently disabled)
@@ -437,6 +468,9 @@ These guards exist because of concrete bugs:
   ~4.8 s to ~3.5 s at the default τ without shrinking the window. This residual lag is the
   cost of robustness over the (fragile) instantaneous IBI method — fundamentally the
   estimator must observe ~2 periods of the new tempo before it can lock onto it.
+  - On top of this, a genuine **upward** tempo change lags an extra ~1.5 s **by design**:
+    `TempoSmoother` (§5.6) holds a large up-jump until it is confirmed across 3 cycles, to
+    reject the change-transient spike. Downward changes are not delayed.
 - **Fast metronomes (>180 BPM)** depend on the sparsity classifier to avoid folding; a
   very reverberant/noisy click could in principle read as dense.
 - **Possible manual mode switch:** letting the user force "Music" (fold) vs "Metronome"

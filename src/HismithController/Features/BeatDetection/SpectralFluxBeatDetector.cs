@@ -20,6 +20,9 @@ namespace HismithController.BeatDetection;
 // runs AutocorrelationTempoEstimator over it: robust to noisy onsets because it
 // keys off the dominant period, not individual detections. A sparsity classifier
 // decides only whether to octave-fold (dense music) or not (sparse click train).
+// The estimate is then passed through TempoSmoother before it is published, which
+// gates large upward jumps behind a few cycles of confirmation so the transient
+// spike during an input tempo change does not reach CurrentBpm.
 //
 // Threading: flux/onset processing runs synchronously on the NAudio audio capture
 // thread (IAudioCaptureService.SamplesAvailable); the autocorrelation runs on a
@@ -62,6 +65,18 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     // 200 ms minimum between onsets caps the visual pulse rate at 300 BPM and
     // suppresses double-triggers on the same transient across adjacent hops.
     private const double MinInterOnsetMs = 200.0;
+
+    // ── Tempo output smoothing (TempoSmoother) ──────────────────────────────────
+    // Fixed in code — intentionally not user-configurable (same convention as
+    // OnsetMultiplier above). They tune the asymmetric confirmation filter that
+    // rejects the transient upward spike during an input tempo change (OpenPoint 2):
+    // a rise is "large" only when it clears BOTH the factor and the absolute floor,
+    // and a large rise must persist for TempoUpConfirmCycles of the 500 ms tempo
+    // cycle (≈ 1.5 s) before it is adopted.
+    private const double TempoUpJumpFactor       = 1.25; // > +25 %  ⇒ candidate for gating
+    private const int    TempoUpJumpMinBpm       = 20;   // and > +20 BPM (both required)
+    private const int    TempoUpConfirmCycles    = 3;    // ≈ 1.5 s at TempoIntervalMs
+    private const int    TempoConfirmToleranceBpm = 8;   // successive candidates within this ⇒ same tempo
 
     // ── Ring buffer ───────────────────────────────────────────────────────────
     // _ringWritePos points to the oldest sample (= next slot to overwrite).
@@ -115,6 +130,12 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     private readonly double _sparsityMetronomeMin;
     private readonly double _sparsityDenseMax;
 
+    // Smooths the published tempo: gates large upward jumps behind a few cycles of
+    // confirmation so a transient change-spike never reaches CurrentBpm. Touched by
+    // the tempo timer thread (Update) and the capture state thread (Reset); both are
+    // internally locked. See TempoSmoother.
+    private readonly TempoSmoother _tempoSmoother;
+
     // Recomputes tempo every TempoIntervalMs off the audio thread so the O(lag×n)
     // autocorrelation never runs inside the <5 ms/hop audio budget.
     private readonly System.Threading.Timer _tempoTimer;
@@ -161,6 +182,11 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
             preferredCenter:   settings.PreferredBpmCenter,
             preferredSigma:    settings.PreferredBpmSigma,
             recencyTauSeconds: settings.RecencyTauSeconds);
+        _tempoSmoother = new TempoSmoother(
+            jumpUpFactor:        TempoUpJumpFactor,
+            jumpUpMinBpm:        TempoUpJumpMinBpm,
+            confirmCycles:       TempoUpConfirmCycles,
+            confirmToleranceBpm: TempoConfirmToleranceBpm);
 
         // Lifetime matches the app; unsubscribing / disposal is not needed.
         _audioRunning = audioService.State == AudioCaptureState.Running;
@@ -183,6 +209,9 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
             _autoBpm      = 0;
             _autoConf     = 0f;
             _foldDense    = false;
+            // Drop the smoother's baseline so the next session re-locks from scratch
+            // rather than gating against a stale applied tempo.
+            _tempoSmoother.Reset();
             lock (_osfLock)
             {
                 _osfWritePos = 0;
@@ -359,7 +388,10 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
         // still runs so this can be re-enabled (pass fold: _foldDense) if a future music
         // mode wants octave folding back. See documentation/SoundModeImplementation.md §6.
         var est = _tempoEstimator.Analyze(snapshot, HopMs, fold: false);
-        _autoBpm  = est.Bpm;
+        // Gate the published tempo: a large upward jump (e.g. the transient spike while
+        // the input tempo changes) must be confirmed over a few cycles before it is
+        // applied; decreases and small changes pass straight through. See TempoSmoother.
+        _autoBpm  = _tempoSmoother.Update(est.Bpm);
         _autoConf = est.Confidence;
     }
 

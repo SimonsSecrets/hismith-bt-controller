@@ -366,7 +366,8 @@ public partial class SoundModeViewModel : ObservableObject
     // Writes the current mapper output to the device, but only when it changed since
     // the last write (so a steady tempo produces no redundant BLE traffic). The cap
     // to the device's physical max happens inside SetTargetBpmAsync. Direct-apply,
-    // no ramp (§3.1): the BpmEstimator already smooths the music BPM upstream.
+    // no ramp (§3.1): TempoSmoother already gates sudden upward tempo jumps upstream
+    // (in the beat detector), so the music BPM reaching here is already smoothed.
     private void PushDeviceBpm()
     {
         if (_connectedDevice.CurrentDevice is not { } device) return;
