@@ -38,6 +38,8 @@
     <None Remove="Content\0NU38.jpg" />
     <!-- Bundled into the assembly so the title-bar/taskbar icon can be set via pack URI. -->
     <Resource Include="Logo.ico" />
+    <!-- Bundled so the subtle card-frame watermark can load it via pack URI. -->
+    <Resource Include="Logo.png" />
   </ItemGroup>
 
   <ItemGroup>

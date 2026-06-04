@@ -242,11 +242,16 @@
                 <!-- Content layer -->
                 <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}"
                         BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
-                        Padding="28" ClipToBounds="True">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <ContentControl Content="{Binding ActiveModeContent}" />
-                    </ScrollViewer>
+                        ClipToBounds="True">
+                    <Grid>
+                        <Image Style="{StaticResource FrameWatermark}" />
+                        <!-- Padding moved onto the content so the watermark can bleed to the frame edge. -->
+                        <ScrollViewer Margin="28"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <ContentControl Content="{Binding ActiveModeContent}" />
+                        </ScrollViewer>
+                    </Grid>
                 </Border>
             </Grid>
         </Grid>

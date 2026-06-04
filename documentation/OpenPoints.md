@@ -11,7 +11,7 @@ The hook is gated on `IsConnected` and bails when the app is the active window (
 ## 2. Sound mode sudden tempo changes
 Issue: In sound mode, when changing the metronome input tempo, detected bpm often jumps really high for a short time.
 This is kind of expected, since the metronome temp change results in two ticks being really close together.
-Goal: Implement a mechanism to smooth out the tempo change, specifically handling these sudden metronome input changes.
+Goal: Implement a mechanism to smooth out the tempo change, specifically handling these sudden metronome input changes (large jumps up should be followed more conservatively, eg need more than two rapid succession ticks to be applied).
 
 ## 3. Device calibration
 Issue: It seems like the device response is not fully linear to the percentage input.

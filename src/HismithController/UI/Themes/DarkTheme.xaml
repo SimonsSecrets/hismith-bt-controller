@@ -140,4 +140,7 @@
     <Color x:Key="PopoverShadowColor">#99000000</Color>
     <system:Double x:Key="CardShadowOpacity">1.0</system:Double>
 
+    <!-- Watermark reads brighter against the dark card surface (design dark .frame-watermark). -->
+    <system:Double x:Key="FrameWatermarkOpacity">0.06</system:Double>
+
 </ResourceDictionary>
