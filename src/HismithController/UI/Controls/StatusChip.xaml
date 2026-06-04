@@ -103,7 +103,7 @@
 
                         <!-- Signal -->
                         <Border BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0"
-                                Padding="0,8">
+                                Padding="0,8,0,12">
                             <DockPanel>
                                 <TextBlock Text="Signal" FontSize="12"
                                            Foreground="{DynamicResource TextDimBrush}" VerticalAlignment="Center" />
@@ -119,18 +119,6 @@
                                             VerticalAlignment="Bottom" Height="13"
                                             Background="{DynamicResource RoseBrush}" />
                                 </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <!-- Mode -->
-                        <Border BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0"
-                                Padding="0,8,0,12">
-                            <DockPanel>
-                                <TextBlock Text="Mode" FontSize="12"
-                                           Foreground="{DynamicResource TextDimBrush}" VerticalAlignment="Center" />
-                                <TextBlock Text="BLE GATT · WriteWithoutResp" FontSize="12"
-                                           Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right"
-                                           VerticalAlignment="Center" />
                             </DockPanel>
                         </Border>
 

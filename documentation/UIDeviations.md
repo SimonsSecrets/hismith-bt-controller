@@ -65,13 +65,16 @@ Issues that the user does not want to fix are marked with [SKIP]
 
 ## 3. Lost-connection banner
 
-### 3.1 🔴 Connected-state lost banner not implemented
+### 3.1 ✅ Connected-state lost banner — IMPLEMENTED
 - **Design** (`app.jsx` `LostBanner`, `index.html:500` `.banner`): a coral banner shown **above the
   content while connected** — warning icon, "Connection lost" / "Your device has stopped. Your settings
   are preserved.", with Dismiss + Reconnect buttons.
-- **WPF** (`ConnectedView.xaml`): no banner region. (The "lost" handling that exists is only the status
-  chip's `Lost` dot color; the full banner is absent.)
-- **Fix:** add the banner to `ConnectedView` above the mode content, driven by a "connection lost" state.
+- **Done** (`ConnectedView.xaml`): a coral banner (`CoralTintBrush` bg, `#ECC1B5` border, warn-triangle
+  in a white circle, the two design text lines) added as a new top row above the mode bar, shown via
+  `MainViewModel.IsConnectionLost` (set in `OnBleStatusChanged` when the BLE link drops while
+  connected; both modes are force-stopped there too). **Deviation:** the **Dismiss button is omitted**
+  per the user — the only action is **Reconnect** (`ReconnectCommand`), which reuses the disconnect/reset
+  path to return to the pre-connect scan screen (rather than the design's in-place re-scan).
 
 ---
 
@@ -334,7 +337,7 @@ Explorer" action and theme persistence both map to existing `OpenTasks.md` items
 - [ ] 1.1 Custom title bar (logo + window buttons) — 🔴 [SKIP]
 - [ ] 1.2 Fixed size + rounded corners + window shadow — 🟡 [SKIP]
 - [x] 2.1 First-run welcome overlay (new tagline, no Skip button) — ✅
-- [ ] 3.1 Lost-connection banner (connected state) — 🔴
+- [x] 3.1 Lost-connection banner (connected state) — ✅ (Reconnect-only; Dismiss omitted per user)
 - [ ] 4.1 Toast notifications — 🟢 [SKIP]
 - [x] 5.1 "Bluetooth unavailable" screen — ✅
 - [x] 5.2 Selected device icon turns white — ✅

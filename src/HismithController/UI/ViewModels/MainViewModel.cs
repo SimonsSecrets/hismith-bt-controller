@@ -44,6 +44,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPopoverOpen;
 
+    // Drives the inline coral "Connection lost" banner in ConnectedView (UIDeviations §3.1).
+    // Set when the BLE link drops while connected; cleared on Reconnect / Disconnect.
+    [ObservableProperty]
+    private bool _isConnectionLost;
+
     // App-level: when true the Settings screen overlays the whole window (replacing the
     // mode/connection content and hiding the footer), matching the design. Opened from the
     // connected mode-bar gear and the connection-screen FAB; both share this one flag.
@@ -102,10 +107,50 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void OpenSettings() => IsSettingsOpen = true;
+    private async Task OpenSettingsAsync()
+    {
+        IsSettingsOpen = true;
+        // Opening Settings leaves the active mode, so release the device it was driving.
+        await ReleaseActiveModeAsync();
+    }
 
     [RelayCommand]
-    private void CloseSettings() => IsSettingsOpen = false;
+    private async Task CloseSettingsAsync()
+    {
+        IsSettingsOpen = false;
+        // Re-arm the mode we're returning to (Sound restarts capture; Manual resets to 0).
+        if (ActiveMode == "Sound")
+            await _soundModeViewModel.InitializeAsync();
+        else
+            await ManualModeViewModel.InitializeAsync();
+    }
+
+    // Stops whatever the active mode was driving. Manual mode never sends its own stop
+    // (ForceStop only zeroes the UI), and Sound mode owns audio capture, so handle both
+    // and finish with an explicit BLE 0 to cover Manual mode's missing stop command.
+    private async Task ReleaseActiveModeAsync()
+    {
+        if (ActiveMode == "Sound")
+            await _soundModeViewModel.DeactivateAsync();   // stops capture + pushes 0
+        ManualModeViewModel.ForceStop();
+        try
+        {
+            if (_connectedDevice.CurrentDevice is { } device)
+                await device.SetTargetBpmAsync(0);
+        }
+        catch
+        {
+            // Best-effort: the device may already be gone.
+        }
+    }
+
+    [RelayCommand]
+    private async Task ReconnectAsync()
+    {
+        IsConnectionLost = false;
+        // Reuse the disconnect/reset path so we land back on the pre-connect scan screen.
+        await DisconnectAsync();
+    }
 
     [RelayCommand]
     private void DismissWelcome()
@@ -143,6 +188,7 @@ public partial class MainViewModel : ObservableObject
     private async Task DisconnectAsync()
     {
         IsPopoverOpen = false;
+        IsConnectionLost = false;
         await _connectedDevice.DisconnectAsync();
         IsConnected = false;
         DeviceName = string.Empty;
@@ -187,11 +233,11 @@ public partial class MainViewModel : ObservableObject
         ActiveMode = mode;
     }
 
-    // Called before ActiveMode changes; stops the outgoing mode's capture/ramp.
+    // Called before ActiveMode changes; releases the device the outgoing mode was driving
+    // (ActiveMode still holds the outgoing mode here) so it never keeps running into the next mode.
     partial void OnActiveModeChanging(string value)
     {
-        if (ActiveMode == "Sound")
-            _ = _soundModeViewModel.DeactivateAsync();
+        _ = ReleaseActiveModeAsync();
     }
 
     partial void OnActiveModeChanged(string value)
@@ -244,11 +290,12 @@ public partial class MainViewModel : ObservableObject
             if (status.State == BleConnectionState.Disconnected && IsConnected)
             {
                 ChipState = ChipState.Lost;
-                // Release Sound Mode so it stops trying to drive a device that is gone:
-                // flip IsDrivingDevice off (no further BPM until the user re-engages),
-                // mirroring Manual mode's behaviour. The "Connection lost" banner is the
-                // ChipState.Lost surface above.
+                IsConnectionLost = true;
+                // Release both modes so neither keeps trying to drive a device that is gone
+                // (no further BPM until the user reconnects). The inline coral banner
+                // (IsConnectionLost) is the user-facing surface.
                 _soundModeViewModel.ForceStop();
+                ManualModeViewModel.ForceStop();
             }
         });
     }

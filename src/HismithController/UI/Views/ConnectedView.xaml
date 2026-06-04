@@ -64,11 +64,73 @@
         <Grid Margin="20,24,20,24">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
+            <!-- ========== LOST-CONNECTION BANNER (UIDeviations §3.1) ========== -->
+            <!-- Coral banner shown above the mode content when the BLE link drops (design app.jsx
+                 LostBanner / index.html .banner). Dismiss is intentionally omitted: Reconnect is the
+                 only action and returns to the pre-connect scan screen. -->
+            <Border Grid.Row="0" Margin="0,0,0,16"
+                    Visibility="{Binding IsConnectionLost, Converter={StaticResource BoolToVis}}"
+                    Background="{DynamicResource CoralTintBrush}"
+                    BorderBrush="#ECC1B5" BorderThickness="1"
+                    CornerRadius="12" Padding="14,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Warn badge: white circle + coral warn triangle -->
+                    <Border Grid.Column="0" Width="28" Height="28" CornerRadius="14"
+                            Background="White" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <Path Data="M12 4 L22 20 H2 Z M12 10 V15 M12 18 V18.5"
+                              Stroke="{DynamicResource CoralBrush}" StrokeThickness="1.5"
+                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Width="16" Height="16" Stretch="Uniform"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+
+                    <!-- Message -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Connection lost" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="#5C2A20" />
+                        <TextBlock Text="Your device has stopped. Your settings are preserved."
+                                   FontSize="13" Foreground="#7A3A2C" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <!-- Action: Reconnect only -->
+                    <Button Grid.Column="2" Content="Reconnect"
+                            Command="{Binding ReconnectCommand}" Cursor="Hand"
+                            VerticalAlignment="Center" Margin="12,0,0,0">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="BannerBtn" CornerRadius="8" Padding="14,0"
+                                        Height="32" Background="{DynamicResource CoralBrush}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="BannerBtn" Property="Background" Value="#C97A6A" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <Button.Resources>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="TextElement.Foreground" Value="White" />
+                                <Setter Property="TextElement.FontSize" Value="12.5" />
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+                </Grid>
+            </Border>
+
             <!-- ========== MODE BAR ========== -->
-            <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid Grid.Row="1" Margin="0,0,0,16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -169,7 +231,7 @@
             </Grid>
 
             <!-- ========== MODE CONTENT ========== -->
-            <Grid Grid.Row="1">
+            <Grid Grid.Row="2">
                 <!-- Shadow layer -->
                 <Border CornerRadius="14" Background="{DynamicResource SurfaceBrush}">
                     <Border.Effect>
