@@ -74,5 +74,10 @@
              everything, including the Settings overlay. DataContext inherits from the Window
              (MainViewModel), so the "Get started" button binds to DismissWelcomeCommand. -->
         <views:WelcomeView Visibility="{Binding IsWelcomeOpen, Converter={StaticResource BoolToVis}}" />
+
+        <!-- Emergency-stop full-screen overlay (design StopOverlay): mounted last so its coral flash
+             paints over everything — mode content, footer, Settings and even the welcome overlay.
+             Auto-hidden by the ViewModel's _stopOverlayTimer. DataContext inherits the Window. -->
+        <views:StopOverlayView Visibility="{Binding IsStopOverlayVisible, Converter={StaticResource BoolToVis}}" />
     </Grid>
 </Window>

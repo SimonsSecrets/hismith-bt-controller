@@ -26,6 +26,7 @@ public partial class MainViewModel : ObservableObject
     private readonly SoundModeViewModel _soundModeViewModel;
     private readonly UserPreferencesStore _prefsStore;
     private DispatcherTimer? _stopFlashTimer;
+    private DispatcherTimer? _stopOverlayTimer;
 
     [ObservableProperty]
     private object _currentView;
@@ -75,6 +76,11 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isStopFlashing;
+
+    // Drives the full-screen emergency-stop overlay (design StopOverlay). Shown the instant a
+    // stop fires, then auto-hidden by _stopOverlayTimer after the fade-out completes (~1.24s).
+    [ObservableProperty]
+    private bool _isStopOverlayVisible;
 
     [ObservableProperty]
     private object? _activeModeContent;
@@ -265,6 +271,20 @@ public partial class MainViewModel : ObservableObject
             _stopFlashTimer.Stop();
         };
         _stopFlashTimer.Start();
+
+        // Full-screen overlay (design StopOverlay): visible immediately, fades out via the view's
+        // storyboard at ~900ms; this timer collapses it once the 320ms fade completes (~1.24s
+        // total). Restarting on each press re-runs the storyboard from the start (design stopNonce).
+        IsStopOverlayVisible = false;   // force a change so a rapid re-press re-triggers EnterActions
+        IsStopOverlayVisible = true;
+        _stopOverlayTimer?.Stop();
+        _stopOverlayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1240) };
+        _stopOverlayTimer.Tick += (_, _) =>
+        {
+            IsStopOverlayVisible = false;
+            _stopOverlayTimer.Stop();
+        };
+        _stopOverlayTimer.Start();
     }
 
     [RelayCommand]

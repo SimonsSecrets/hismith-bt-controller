@@ -86,6 +86,16 @@
     <Color x:Key="CoralTintColor">#3A2722</Color>
     <SolidColorBrush x:Key="CoralTintBrush" Color="{StaticResource CoralTintColor}" />
 
+    <!-- Emergency-stop full-screen overlay backdrop (design .stop-overlay, dark variant:
+         radial circle at 50% 40%, rgba(225,90,76,0.38) → rgba(225,90,76,0.20)@52% → rgba(0,0,0,0.55)@100%).
+         ARGB alpha = round(opacity*255): 0.38→#61, 0.20→#33, 0.55→#8C. -->
+    <RadialGradientBrush x:Key="StopOverlayBrush" GradientOrigin="0.5,0.4" Center="0.5,0.4"
+                         RadiusX="1.0" RadiusY="1.0">
+        <GradientStop Color="#61E15A4C" Offset="0" />
+        <GradientStop Color="#33E15A4C" Offset="0.52" />
+        <GradientStop Color="#8C000000" Offset="1" />
+    </RadialGradientBrush>
+
     <!-- Amber (scanning / connecting) -->
     <Color x:Key="AmberColor">#E0BB7A</Color>
     <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}" />

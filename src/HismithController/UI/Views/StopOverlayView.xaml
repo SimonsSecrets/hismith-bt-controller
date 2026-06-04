@@ -1,0 +1,125 @@
+<UserControl x:Class="HismithController.Views.StopOverlayView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:HismithController.ViewModels"
+             d:DataContext="{d:DesignInstance vm:MainViewModel}"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             IsHitTestVisible="False">
+
+    <!-- Full-window emergency-stop confirmation (design StopOverlay / .stop-overlay). The control
+         is mounted last in MainWindow and bound visible only while IsStopOverlayVisible is true, so
+         it covers the whole window including the footer. IsHitTestVisible=False: purely visual, it
+         must not swallow clicks during its brief life. The backdrop blur from the design is omitted
+         (a real backdrop-filter would mean re-rendering the window behind it every frame — not worth
+         the cost for a ~1s overlay); the themed radial gradient alone reads as the focal flash.
+
+         The visuals live in a ControlTemplate (not a Style) so the storyboards can reference the
+         named ScaleTransforms/rings by TargetName — the same pattern the StopButton uses in
+         SharedStyles.xaml. Opacity is driven by the storyboard: snaps to 1 on show, holds, then
+         fades to 0 from 900ms (design 900ms "out" → 1240ms unmount; the ViewModel's _stopOverlayTimer
+         collapses the control once the fade has finished). -->
+    <UserControl.Template>
+        <ControlTemplate TargetType="UserControl">
+            <Grid x:Name="Root" Background="{DynamicResource StopOverlayBrush}" Opacity="1">
+                <!-- "Blast": badge + title + subtitle, centred, scaled together by stopPop. -->
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                            RenderTransformOrigin="0.5,0.5">
+                    <StackPanel.RenderTransform>
+                        <ScaleTransform x:Name="BlastScale" ScaleX="0.82" ScaleY="0.82" />
+                    </StackPanel.RenderTransform>
+
+                    <!-- Badge: 116×116 coral disc with a soft white halo ring and a coral drop
+                         shadow. Decorative expanding rings sit on top; a filled square is the glyph. -->
+                    <Grid Width="128" Height="128" HorizontalAlignment="Center" Margin="0,0,0,20">
+                        <!-- Halo ring (design box-shadow 0 0 0 6px rgba(255,255,255,0.14)). -->
+                        <Ellipse Width="128" Height="128" Stroke="#24FFFFFF" StrokeThickness="6" />
+
+                        <!-- Coral disc + shadow (no text inside, so the shadow effect is safe here). -->
+                        <Ellipse Width="116" Height="116" Fill="#D14B3D">
+                            <Ellipse.Effect>
+                                <DropShadowEffect ShadowDepth="6" BlurRadius="44" Direction="270"
+                                                  Color="#D14B3D" Opacity="0.55" />
+                            </Ellipse.Effect>
+                        </Ellipse>
+
+                        <!-- Expanding rings (decorative). -->
+                        <Ellipse x:Name="Ring1" Width="116" Height="116" Stroke="#B3FFFFFF"
+                                 StrokeThickness="2" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <ScaleTransform x:Name="Ring1Scale" ScaleX="1" ScaleY="1" />
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <Ellipse x:Name="Ring2" Width="116" Height="116" Stroke="#B3FFFFFF"
+                                 StrokeThickness="2" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <ScaleTransform x:Name="Ring2Scale" ScaleX="1" ScaleY="1" />
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+
+                        <!-- Stop glyph: filled rounded white square (design icon "stop"). -->
+                        <Border Width="44" Height="44" CornerRadius="6" Background="White"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <!-- Title + subtitle. No DropShadowEffect on these text-bearing elements
+                         (CLAUDE.md rule) — they render with ClearType. -->
+                    <TextBlock Text="STOPPED" Foreground="White" FontSize="36" FontWeight="Bold"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="Emergency stop · device halted" FontSize="14" FontWeight="Medium"
+                               Foreground="#EAFFFFFF" HorizontalAlignment="Center" Margin="0,8,0,0" />
+                </StackPanel>
+            </Grid>
+
+            <ControlTemplate.Triggers>
+                <!-- Re-runs every time IsStopOverlayVisible flips back to True (the ViewModel toggles
+                     it false→true on each stop so a rapid re-press replays the animation). -->
+                <DataTrigger Binding="{Binding IsStopOverlayVisible}" Value="True">
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <!-- Root fade: hold opaque, then fade out over 320ms from 900ms. -->
+                                <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Root"
+                                                               Storyboard.TargetProperty="Opacity">
+                                    <DiscreteDoubleKeyFrame Value="1" KeyTime="0:0:0" />
+                                    <DiscreteDoubleKeyFrame Value="1" KeyTime="0:0:0.9" />
+                                    <LinearDoubleKeyFrame Value="0" KeyTime="0:0:1.22" />
+                                </DoubleAnimationUsingKeyFrames>
+
+                                <!-- stopPop: blast scales 0.82 → 1.05 → 1 over 360ms. -->
+                                <DoubleAnimationUsingKeyFrames Storyboard.TargetName="BlastScale"
+                                                               Storyboard.TargetProperty="ScaleX">
+                                    <DiscreteDoubleKeyFrame Value="0.82" KeyTime="0:0:0" />
+                                    <LinearDoubleKeyFrame Value="1.05" KeyTime="0:0:0.216" />
+                                    <LinearDoubleKeyFrame Value="1" KeyTime="0:0:0.36" />
+                                </DoubleAnimationUsingKeyFrames>
+                                <DoubleAnimationUsingKeyFrames Storyboard.TargetName="BlastScale"
+                                                               Storyboard.TargetProperty="ScaleY">
+                                    <DiscreteDoubleKeyFrame Value="0.82" KeyTime="0:0:0" />
+                                    <LinearDoubleKeyFrame Value="1.05" KeyTime="0:0:0.216" />
+                                    <LinearDoubleKeyFrame Value="1" KeyTime="0:0:0.36" />
+                                </DoubleAnimationUsingKeyFrames>
+
+                                <!-- stopRing: two decorative rings expand 1 → 1.85 and fade 0.7 → 0
+                                     over 1000ms; the second is delayed 200ms. Pure decoration. -->
+                                <DoubleAnimation Storyboard.TargetName="Ring1Scale" Storyboard.TargetProperty="ScaleX"
+                                                 From="1" To="1.85" Duration="0:0:1" />
+                                <DoubleAnimation Storyboard.TargetName="Ring1Scale" Storyboard.TargetProperty="ScaleY"
+                                                 From="1" To="1.85" Duration="0:0:1" />
+                                <DoubleAnimation Storyboard.TargetName="Ring1" Storyboard.TargetProperty="Opacity"
+                                                 From="0.7" To="0" Duration="0:0:1" />
+                                <DoubleAnimation Storyboard.TargetName="Ring2Scale" Storyboard.TargetProperty="ScaleX"
+                                                 From="1" To="1.85" Duration="0:0:1" BeginTime="0:0:0.2" />
+                                <DoubleAnimation Storyboard.TargetName="Ring2Scale" Storyboard.TargetProperty="ScaleY"
+                                                 From="1" To="1.85" Duration="0:0:1" BeginTime="0:0:0.2" />
+                                <DoubleAnimation Storyboard.TargetName="Ring2" Storyboard.TargetProperty="Opacity"
+                                                 From="0.7" To="0" Duration="0:0:1" BeginTime="0:0:0.2" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </DataTrigger.EnterActions>
+                </DataTrigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+    </UserControl.Template>
+</UserControl>
