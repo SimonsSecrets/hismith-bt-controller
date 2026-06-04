@@ -38,7 +38,6 @@ dotnet test HismithController.slnx
 - **MathNet.Numerics 5.0.0** — `Fourier.ForwardReal()` for FFT in beat detection
 - **Windows WinRT BLE** — `Windows.Devices.Bluetooth.GenericAttributeProfile` (from `net8.0-windows10.0.19041.0` TFM, no extra NuGet needed)
 - **Microsoft.Extensions.DependencyInjection 8.0.0** — DI container
-- **Microsoft.Extensions.Configuration.Json 8.0.0** — `AppConfig.json` settings
 
 Project targets `net8.0-windows10.0.19041.0` (required for WinRT BLE APIs).
 
@@ -151,4 +150,4 @@ Apply this pattern to every card, popover, button, and any element that uses `Dr
 
 ## Mock Mode
 
-Pass `--mock` on the command line or set `"UseMockBle": true` in `AppConfig.json`. `MockBleDeviceService` logs all speed commands to the UI log panel. Audio capture and beat detection run normally in mock mode — no BLE hardware required.
+Pass `--mock` on the command line (mock mode is resolved from startup arguments only; there is no config file). `MockBleDeviceService` logs all speed commands to the UI log panel. Audio capture and beat detection run normally in mock mode — no BLE hardware required.

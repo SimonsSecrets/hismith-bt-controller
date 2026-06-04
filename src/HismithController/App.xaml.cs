@@ -7,7 +7,6 @@ using HismithController.Devices;
 using HismithController.Logging;
 using HismithController.Services;
 using HismithController.ViewModels;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -69,24 +68,18 @@ public partial class App : Application
 
     private void StartupCore(StartupEventArgs e)
     {
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("AppConfig.json", optional: true, reloadOnChange: false)
-            .Build();
-
-        var settings = new AppSettings();
-        configuration.Bind(settings);
-
+        // Mock mode is resolved from startup arguments only — there is no config file.
         // --mock implies both axes; --mock-ble / --mock-audio control each axis independently.
-        bool mockBle = settings.UseMockBle
-            || e.Args.Contains("--mock", StringComparer.OrdinalIgnoreCase)
+        bool mockBle = e.Args.Contains("--mock", StringComparer.OrdinalIgnoreCase)
             || e.Args.Contains("--mock-ble", StringComparer.OrdinalIgnoreCase);
-        bool mockAudio = settings.UseMockAudio
-            || e.Args.Contains("--mock", StringComparer.OrdinalIgnoreCase)
+        bool mockAudio = e.Args.Contains("--mock", StringComparer.OrdinalIgnoreCase)
             || e.Args.Contains("--mock-audio", StringComparer.OrdinalIgnoreCase);
 
-        settings.UseMockBle = mockBle;
-        settings.UseMockAudio = mockAudio;
+        var settings = new AppSettings
+        {
+            UseMockBle = mockBle,
+            UseMockAudio = mockAudio,
+        };
 
         // Resolve the user-editable data folder up front so the logger and preferences store
         // share one location for the whole process (a folder change applies after a restart).

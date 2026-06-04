@@ -51,14 +51,17 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     private static readonly int LowBinHigh =
         Math.Max(2, (int)Math.Ceiling(LowFreqMaxHz * FftSize / SampleRate));
 
-    // Adaptive threshold: mean of the last FluxHistoryLen flux values × multiplier.
+    // Adaptive threshold: mean of the last FluxHistoryLen flux values × OnsetMultiplier.
     private const int FluxHistoryLen = 40;
+
+    // Adaptive spectral-flux onset threshold: threshold = mean(flux history) × this.
+    // Higher requires a more prominent transient to fire a beat; lower is more
+    // sensitive. Fixed in code — intentionally not user-configurable.
+    private const float OnsetMultiplier = 1.5f;
 
     // 200 ms minimum between onsets caps the visual pulse rate at 300 BPM and
     // suppresses double-triggers on the same transient across adjacent hops.
     private const double MinInterOnsetMs = 200.0;
-
-    private readonly float _onsetMultiplier;
 
     // ── Ring buffer ───────────────────────────────────────────────────────────
     // _ringWritePos points to the oldest sample (= next slot to overwrite).
@@ -145,7 +148,6 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
 
     public SpectralFluxBeatDetector(IAudioCaptureService audioService, AppSettings settings)
     {
-        _onsetMultiplier = (float)settings.OnsetMultiplier;
         _hannWindow      = BuildHannWindow(FftSize);
 
         int osfLen = Math.Max(64, (int)Math.Round(settings.OsfWindowSeconds * SampleRate / HopSize));
@@ -294,7 +296,7 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
             fluxMean += _fluxHistory[i];
         fluxMean /= _fluxHistoryCount;
 
-        double threshold = fluxMean * _onsetMultiplier;
+        double threshold = fluxMean * OnsetMultiplier;
         if (threshold <= 0.0) return;
 
         // Local-maximum test: only the peak of a rising-then-falling flux run fires,
