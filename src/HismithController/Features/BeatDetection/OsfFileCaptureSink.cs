@@ -53,6 +53,7 @@ public sealed class OsfFileCaptureSink : IOsfCaptureSink
             _writer.WriteLine($"tempoUpJumpMinBpm={h.TempoUpJumpMinBpm.ToString(c)}");
             _writer.WriteLine($"tempoUpConfirmCycles={h.TempoUpConfirmCycles.ToString(c)}");
             _writer.WriteLine($"tempoConfirmToleranceBpm={h.TempoConfirmToleranceBpm.ToString(c)}");
+            _writer.WriteLine($"tempoCorroborationMin={h.TempoCorroborationMin.ToString(c)}");
             _writer.WriteLine($"startedUtc={DateTimeOffset.UtcNow.ToString("O", c)}");
             _writer.WriteLine("# hopIndex flux audioRunning");
             _writer.Flush();

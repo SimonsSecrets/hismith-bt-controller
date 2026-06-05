@@ -18,7 +18,8 @@ public sealed record OsfCaptureHeader(
     double TempoUpJumpFactor,
     int    TempoUpJumpMinBpm,
     int    TempoUpConfirmCycles,
-    int    TempoConfirmToleranceBpm);
+    int    TempoConfirmToleranceBpm,
+    double TempoCorroborationMin);
 
 // Diagnostic sink for the sound-mode tempo pipeline (OpenPoints.md item 2). Records the
 // onset-strength envelope (one flux value per FFT hop) plus the per-cycle tempo-estimator

@@ -97,6 +97,10 @@ double jumpFactor     = Opt("--jump-factor",    H("tempoUpJumpFactor", 1.25));
 int    jumpMin        = (int)Opt("--jump-min",  Hi("tempoUpJumpMinBpm", 20));
 int    confirmCycles  = (int)Opt("--confirm-cycles", Hi("tempoUpConfirmCycles", 3));
 int    confirmTol     = (int)Opt("--confirm-tol",    Hi("tempoConfirmToleranceBpm", 8));
+// Corroboration threshold for immediate adoption of a large up-jump. Default 1.0 keeps the
+// pure time-based behaviour for captures recorded before this field existed; pass
+// --corroboration <v> (or recapture) to exercise the early-adopt path.
+double corroborationMin = Opt("--corroboration", H("tempoCorroborationMin", 1.0));
 
 // --osf-window override changes how much history each cycle's snapshot spans (in samples).
 double osfWindowOverride = Opt("--osf-window", -1.0);
@@ -111,20 +115,22 @@ var estimator = new AutocorrelationTempoEstimator(
     recencyTauSeconds: tau);
 
 var smoother = new TempoSmoother(
-    jumpUpFactor:        jumpFactor,
-    jumpUpMinBpm:        jumpMin,
-    confirmCycles:       confirmCycles,
-    confirmToleranceBpm: confirmTol);
+    jumpUpFactor:           jumpFactor,
+    jumpUpMinBpm:           jumpMin,
+    confirmCycles:          confirmCycles,
+    confirmToleranceBpm:    confirmTol,
+    corroborationThreshold: corroborationMin);
 
 // ── Replay ─────────────────────────────────────────────────────────────────────
 Console.WriteLine($"Capture : {path}");
 Console.WriteLine($"hopMs={hopMs.ToString("0.####", ci)}  osfLen={osfLen}  hops={flux.Count}  cycles={cycles.Count}");
 Console.WriteLine($"estimator: tau={tau.ToString(ci)}  fold=false");
 Console.WriteLine($"smoother : jumpFactor={jumpFactor.ToString(ci)} jumpMin={jumpMin} " +
-                  $"confirmCycles={confirmCycles} confirmTol={confirmTol}");
+                  $"confirmCycles={confirmCycles} confirmTol={confirmTol} " +
+                  $"corroboration={corroborationMin.ToString(ci)}");
 Console.WriteLine();
-Console.WriteLine("  #     head    t(s)  recRaw  rplRaw    d  recSm  rplSm  conf  spars  flag");
-Console.WriteLine("  ----  ------  -----  ------  ------  ---  -----  -----  ----  -----  ----");
+Console.WriteLine("  #     head    t(s)  recRaw  rplRaw    d  recSm  rplSm  conf  hsup  spars  flag");
+Console.WriteLine("  ----  ------  -----  ------  ------  ---  -----  -----  ----  ----  -----  ----");
 
 var span = flux.ToArray();
 int n = 0, mismatches = 0;
@@ -135,7 +141,7 @@ foreach (var cyc in cycles)
     var window = span.AsSpan(start, head - start);
 
     var est = estimator.Analyze(window, hopMs, fold: false);
-    int rplSmoothed = smoother.Update(est.Bpm);
+    int rplSmoothed = smoother.Update(est.Bpm, est.HarmonicSupport);
 
     int dRaw = est.Bpm - cyc.RawBpm;
     bool mismatch = dRaw != 0;
@@ -148,7 +154,7 @@ foreach (var cyc in cycles)
     double t = cyc.Head * hopMs / 1000.0;
     Console.WriteLine(
         $"  {n,4}  {cyc.Head,6}  {t,5:0.0}  {cyc.RawBpm,6}  {est.Bpm,6}  {dRaw,3}  " +
-        $"{cyc.Smoothed,5}  {rplSmoothed,5}  {est.Confidence,4:0.00}  {cyc.Sparsity,5:0.00}  {flag}");
+        $"{cyc.Smoothed,5}  {rplSmoothed,5}  {est.Confidence,4:0.00}  {est.HarmonicSupport,4:0.00}  {cyc.Sparsity,5:0.00}  {flag}");
     n++;
 }
 

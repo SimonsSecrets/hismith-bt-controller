@@ -25,7 +25,13 @@ namespace HismithController.BeatDetection;
 // unit-testable by feeding synthetic OSF arrays (see AutocorrelationTempoEstimatorTests).
 public sealed class AutocorrelationTempoEstimator
 {
-    public readonly record struct TempoEstimate(int Bpm, float Confidence);
+    // HarmonicSupport: how strongly the chosen period repeats — ac[2L]/ac[L] in [0,1].
+    // High for a genuinely periodic train (the autocorrelation also peaks at twice the
+    // lag), ~0 for a one-off interval such as the transient gap thrown off while the
+    // input tempo changes. The TempoSmoother uses it to adopt a corroborated up-jump
+    // immediately instead of waiting out the confirmation window. 0 when 2L is outside
+    // the analysed lag range (period too slow to test the harmonic).
+    public readonly record struct TempoEstimate(int Bpm, float Confidence, float HarmonicSupport);
 
     // Subharmonic rejection: when promoting the global-max lag down to a divisor
     // (½, ⅓, ¼ tempo → the true period), that divisor lag must itself be a local
@@ -71,7 +77,7 @@ public sealed class AutocorrelationTempoEstimator
     {
         int n = osf.Length;
         if (n < 8 || hopMs <= 0.0)
-            return new TempoEstimate(0, 0f);
+            return new TempoEstimate(0, 0f, 0f);
 
         // Lag bounds (in OSF samples) for the supported BPM range. A faster tempo
         // ⇒ shorter period ⇒ smaller lag. Cap lagMax at n/2 so every lag still has
@@ -81,7 +87,7 @@ public sealed class AutocorrelationTempoEstimator
         lagMin = Math.Max(1, lagMin);
         lagMax = Math.Min(lagMax, n / 2);
         if (lagMax <= lagMin)
-            return new TempoEstimate(0, 0f);
+            return new TempoEstimate(0, 0f, 0f);
 
         // Recency weighting: emphasise recent OSF so a tempo change is not masked by
         // stale evidence still in the window. The snapshot is ordered oldest→newest
@@ -123,7 +129,7 @@ public sealed class AutocorrelationTempoEstimator
             sumSq += d * d;
         }
         if (sumSq <= 1e-12)
-            return new TempoEstimate(0, 0f);
+            return new TempoEstimate(0, 0f, 0f);
 
         // Biased autocorrelation: every lag is divided by the same constant (sumSq),
         // not by its overlap count. This intentionally favours shorter lags, so the
@@ -155,7 +161,7 @@ public sealed class AutocorrelationTempoEstimator
         }
 
         if (bestAc <= 0.0)
-            return new TempoEstimate(0, 0f);
+            return new TempoEstimate(0, 0f, 0f);
 
         // Subharmonic rejection (octave-down correction). The autocorrelation of a
         // periodic onset train peaks at the true period AND every integer multiple of
@@ -190,6 +196,28 @@ public sealed class AutocorrelationTempoEstimator
             }
         }
 
+        // Self-harmonic support of the chosen period (after subharmonic promotion): a
+        // genuinely repeating train also correlates at twice the lag (every-other-beat),
+        // so the half-tempo peak is a substantial fraction of ac[L]; a one-off interval
+        // (the transient gap during a tempo change) has ~no energy there. 0 when 2L lies
+        // outside the analysed range (period slower than ~half the longest testable lag).
+        // bestAc > 0 here (guarded above), so the division is safe. We search a small
+        // neighbourhood around 2L rather than the exact doubled lag: when the fundamental
+        // sits between integer lags (e.g. 181 BPM → L=57, true 2L≈113.5), ac[2·L] lands on
+        // the peak's flank and badly understates support — the same integer-rounding fix
+        // the subharmonic search above uses.
+        float harmonicSupport = 0f;
+        int twoLag = 2 * bestLag;
+        if (twoLag <= lagMax)
+        {
+            int lo = Math.Max(lagMin, twoLag - SubharmonicSearchRadius);
+            int hi = Math.Min(lagMax, twoLag + SubharmonicSearchRadius);
+            double peak = ac[lo];
+            for (int lag = lo + 1; lag <= hi; lag++)
+                if (ac[lag] > peak) peak = ac[lag];
+            harmonicSupport = (float)Math.Clamp(Math.Max(0.0, peak) / bestAc, 0.0, 1.0);
+        }
+
         // Parabolic interpolation around the peak for sub-sample lag precision,
         // which matters at small lags where one sample is several BPM.
         double refinedLag = bestLag;
@@ -214,7 +242,7 @@ public sealed class AutocorrelationTempoEstimator
         // a correlation strength in [0, 1] for a well-locked tempo.
         float confidence = (float)Math.Clamp(bestAc, 0.0, 1.0);
 
-        return new TempoEstimate((int)Math.Round(bpm), confidence);
+        return new TempoEstimate((int)Math.Round(bpm), confidence, harmonicSupport);
     }
 
     // Choose among the harmonic set {bpm×2, bpm, bpm/2, bpm/3} the candidate that

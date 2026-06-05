@@ -9,8 +9,15 @@ namespace HismithController.Tests.BeatDetection;
 public class TempoSmootherTests
 {
     // Same constants the detector uses: large = > +25 % AND > +14 BPM; 5 cycles to confirm.
+    // corroborationThreshold defaults to 1.0 (early adoption disabled) so the time-based
+    // path is exercised in isolation; the corroboration tests construct their own.
     private static TempoSmoother NewSmoother()
         => new(jumpUpFactor: 1.25, jumpUpMinBpm: 14, confirmCycles: 5, confirmToleranceBpm: 8);
+
+    // Detector config with corroboration enabled (matches TempoCorroborationMin = 0.25).
+    private static TempoSmoother NewCorroboratingSmoother()
+        => new(jumpUpFactor: 1.25, jumpUpMinBpm: 14, confirmCycles: 5, confirmToleranceBpm: 8,
+               corroborationThreshold: 0.25);
 
     [Fact]
     public void FirstReading_AdoptedImmediately()
@@ -88,6 +95,54 @@ public class TempoSmootherTests
         Assert.Equal(20, s.Update(37)); // cycle 3
         Assert.Equal(20, s.Update(37)); // cycle 4 — still under ConfirmCycles
         Assert.Equal(30, s.Update(30)); // settle: +10 over 20 is not "large" → adopted, 37 dropped
+    }
+
+    [Fact]
+    public void CorroboratedLargeUpJump_AdoptedImmediately()
+    {
+        var s = NewCorroboratingSmoother();
+        s.Update(120);
+        // 180 is a large up-jump (+50 % / +60 BPM); support 0.7 ≥ 0.25 ⇒ the new tempo
+        // already repeats, so it is adopted at once instead of waiting 5 cycles.
+        Assert.Equal(180, s.Update(180, harmonicSupport: 0.7));
+    }
+
+    [Fact]
+    public void UncorroboratedLargeUpJump_StillWaitsConfirmCycles()
+    {
+        var s = NewCorroboratingSmoother();
+        s.Update(120);
+        // Support 0.1 < 0.25: not corroborated, so the time-based gate still applies.
+        Assert.Equal(120, s.Update(180, harmonicSupport: 0.1));
+        Assert.Equal(120, s.Update(180, harmonicSupport: 0.1));
+        Assert.Equal(120, s.Update(180, harmonicSupport: 0.1));
+        Assert.Equal(120, s.Update(180, harmonicSupport: 0.1));
+        Assert.Equal(180, s.Update(180, harmonicSupport: 0.1)); // 5th cycle
+    }
+
+    [Fact]
+    public void CorroborationMidPending_AdoptsImmediately()
+    {
+        var s = NewCorroboratingSmoother();
+        s.Update(120);
+        Assert.Equal(120, s.Update(180, harmonicSupport: 0.1)); // pending, not yet corroborated
+        Assert.Equal(120, s.Update(180, harmonicSupport: 0.1));
+        // Corroboration appears (the new period has now repeated) → adopt at once.
+        Assert.Equal(180, s.Update(180, harmonicSupport: 0.6));
+    }
+
+    [Fact]
+    public void Uncorroborated37Overshoot_StillRejected()
+    {
+        // The transition gap has ~zero harmonic support, so corroboration never fires and
+        // the +14 floor / 5-cycle gate still discards it (regression guard with early-adopt on).
+        var s = NewCorroboratingSmoother();
+        Assert.Equal(20, s.Update(20, harmonicSupport: 0.0));
+        Assert.Equal(20, s.Update(37, harmonicSupport: 0.0));
+        Assert.Equal(20, s.Update(37, harmonicSupport: 0.0));
+        Assert.Equal(20, s.Update(37, harmonicSupport: 0.0));
+        Assert.Equal(20, s.Update(37, harmonicSupport: 0.0));
+        Assert.Equal(30, s.Update(30, harmonicSupport: 0.0)); // settle: +10 not large → adopted, 37 dropped
     }
 
     [Fact]

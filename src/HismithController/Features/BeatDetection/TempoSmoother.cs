@@ -12,11 +12,19 @@ namespace HismithController.BeatDetection;
 //   • Reading of 0 (lock lost / silence)         → pass through 0, clear pending.
 //   • Decrease or small increase                 → adopt immediately (responsive;
 //                                                   slowing must never be delayed).
-//   • Large upward jump                          → hold as a pending candidate;
-//                                                   adopt only after it persists for
+//   • Large upward jump, corroborated             → adopt immediately. A large jump whose
+//                                                   period already demonstrably repeats
+//                                                   (estimator HarmonicSupport ≥ the
+//                                                   corroboration threshold) is a genuine
+//                                                   speed-up, not the one-off transition
+//                                                   gap — its repetition IS the
+//                                                   confirmation, so it is not delayed.
+//   • Large upward jump, uncorroborated           → hold as a pending candidate; adopt
+//                                                   only after it persists for
 //                                                   ConfirmCycles consecutive cycles.
 // A spike that fades before ConfirmCycles is therefore discarded and the output
-// holds the previous tempo steady.
+// holds the previous tempo steady. The transition gap has ~zero harmonic support, so it
+// always takes the slow (uncorroborated) path and is still rejected.
 //
 // Threading: Update runs on the tempo-timer thread; Reset runs on the audio capture
 // state-change thread. Both are guarded by _gate so a Reset cannot interleave with
@@ -28,6 +36,7 @@ public sealed class TempoSmoother
     private readonly int    _jumpUpMinBpm;
     private readonly int    _confirmCycles;
     private readonly int    _confirmToleranceBpm;
+    private readonly double _corroborationThreshold;
 
     private readonly object _gate = new();
 
@@ -44,16 +53,24 @@ public sealed class TempoSmoother
     // (the floor alone would). confirmCycles: how many consecutive cycles a large jump
     // must persist before it is adopted. confirmToleranceBpm: how close successive
     // candidates must be to count as confirming the same pending tempo.
-    public TempoSmoother(double jumpUpFactor, int jumpUpMinBpm, int confirmCycles, int confirmToleranceBpm)
+    // corroborationThreshold: minimum estimator HarmonicSupport for a large up-jump to
+    // be adopted immediately rather than waiting out confirmCycles (the transition gap
+    // sits at ~0; a genuinely repeating new tempo is well above it).
+    public TempoSmoother(double jumpUpFactor, int jumpUpMinBpm, int confirmCycles, int confirmToleranceBpm,
+                         double corroborationThreshold = 1.0)
     {
-        _jumpUpFactor        = jumpUpFactor;
-        _jumpUpMinBpm        = jumpUpMinBpm;
-        _confirmCycles       = Math.Max(1, confirmCycles);
-        _confirmToleranceBpm = confirmToleranceBpm;
+        _jumpUpFactor           = jumpUpFactor;
+        _jumpUpMinBpm           = jumpUpMinBpm;
+        _confirmCycles          = Math.Max(1, confirmCycles);
+        _confirmToleranceBpm    = confirmToleranceBpm;
+        _corroborationThreshold = corroborationThreshold;
     }
 
-    // Feed one raw tempo reading; returns the tempo to publish this cycle.
-    public int Update(int rawBpm)
+    // Feed one raw tempo reading and its harmonic support (see AutocorrelationTempoEstimator);
+    // returns the tempo to publish this cycle. harmonicSupport defaults to 0 (uncorroborated)
+    // so callers/tests exercising only the time-based path need not supply it. A default-
+    // constructed corroborationThreshold of 1.0 disables early adoption entirely.
+    public int Update(int rawBpm, double harmonicSupport = 0.0)
     {
         lock (_gate)
         {
@@ -89,9 +106,21 @@ public sealed class TempoSmoother
                 return _applied;
             }
 
-            // Large upward jump: require confirmation across consecutive cycles. A
-            // reading near the existing candidate extends its streak; otherwise it
-            // starts a fresh candidate at count 1.
+            // Large upward jump that is already corroborated — the new period repeats in
+            // the analysis window (harmonic support clears the threshold), so it is a real
+            // speed-up, not the one-off transition gap. Adopt at once and drop any pending
+            // candidate; the repetition is the confirmation.
+            if (harmonicSupport >= _corroborationThreshold)
+            {
+                _applied      = rawBpm;
+                _pending      = 0;
+                _pendingCount = 0;
+                return _applied;
+            }
+
+            // Large upward jump, not yet corroborated: require confirmation across
+            // consecutive cycles. A reading near the existing candidate extends its streak;
+            // otherwise it starts a fresh candidate at count 1.
             if (_pendingCount > 0 && Math.Abs(rawBpm - _pending) <= _confirmToleranceBpm)
                 _pendingCount++;
             else

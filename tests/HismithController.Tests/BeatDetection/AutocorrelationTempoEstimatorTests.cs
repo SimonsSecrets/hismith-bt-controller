@@ -195,4 +195,37 @@ public class AutocorrelationTempoEstimatorTests
         var result = est.Analyze(ImpulseTrain(128), HopMs);
         Assert.True(result.Confidence > 0f);
     }
+
+    // HarmonicSupport distinguishes a genuinely repeating tempo (strong every-other-beat
+    // correlation) from a one-off interval — the TempoSmoother uses it to adopt a
+    // corroborated up-jump immediately instead of waiting out the confirmation window.
+    [Theory]
+    [InlineData(120)]
+    [InlineData(181)] // odd-lag tempo: 2L lands between integer lags — the neighbourhood
+                      // search must still recover strong support (regression for the
+                      // 120→181 jump that otherwise read ~0.15 and missed the threshold).
+    [InlineData(240)]
+    public void Analyze_CleanTrain_HasStrongHarmonicSupport(double bpm)
+    {
+        var result = Default().Analyze(ImpulseTrain(bpm), HopMs, fold: false);
+        Assert.True(result.HarmonicSupport > 0.3f,
+            $"expected strong support at {bpm} BPM, got {result.HarmonicSupport}");
+    }
+
+    [Fact]
+    public void Analyze_SingleInterval_HasNoHarmonicSupport()
+    {
+        // Two onsets ~120 BPM apart (lag 86) and nothing else: the period never repeats,
+        // so there is no energy at twice the lag — like the transient gap thrown off while
+        // the input tempo changes. Support must stay below the corroboration threshold.
+        var osf = new double[OsfLen];
+        ReadOnlySpan<double> kernel = stackalloc double[] { 0.5, 1.0, 0.5 };
+        foreach (int center in stackalloc int[] { 200, 286 })
+            for (int j = 0; j < kernel.Length; j++)
+                osf[center - 1 + j] = kernel[j];
+
+        var result = Default().Analyze(osf, HopMs, fold: false);
+        Assert.True(result.HarmonicSupport < 0.25f,
+            $"a one-off interval must not look corroborated, got {result.HarmonicSupport}");
+    }
 }

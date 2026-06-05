@@ -47,11 +47,34 @@ public partial class SoundModeViewModel : ObservableObject
 
     // Bridges the silent gaps between clicks of a sparse source (slow metronome).
     // The capture service reports NoSignal during these gaps (RMS dips), but a
-    // recent beat means music IS playing. Holds HasAudio=true for one slow-tempo
-    // beat period; if no further beat arrives, falls back to the live RMS state.
-    // 4000 ms ≈ 15 BPM, matching the detector's slowest accepted tempo (MaxIbiMs).
-    private const int AudioHoldMs = 4000;
+    // recent beat means music IS playing. The hold is rearmed on every detected beat
+    // and, on expiry, falls back to the live RMS state (HasAudio = state == Running),
+    // so the device stops only once the hold lapses AND the capture is RMS-silent.
+    //
+    // The window is scaled to the detected tempo (HoldMsForBpm): a stop "stands out"
+    // within a few missed beats, so a fast source releases HasAudio quickly while a
+    // slow source keeps the long bridge. Without this, a fixed 4000 ms hold made a
+    // 120 BPM source take ~4 s to stop (OpenPoints item 2 follow-up). The hold is
+    // DropoutBeats beat periods, clamped to [AudioHoldMinMs, AudioHoldMaxMs]:
+    //   • Ceiling 4000 ms ≈ one 15 BPM period — the detector's slowest tempo; at the
+    //     ceiling the behaviour is identical to the previous fixed hold, so slow
+    //     sources are unchanged.
+    //   • Floor 1000 ms keeps the hold above the capture service's 500 ms silence-RMS
+    //     window, so NoSignal is already latched by the time the hold expires (a
+    //     shorter hold would lapse before silence is detectable and miss the stop).
+    // Shortening is safe against missed onsets: a hold that lapses while audio is
+    // still playing re-reads state == Running and keeps HasAudio true.
+    private const int    AudioHoldMaxMs = 4000;
+    private const int    AudioHoldMinMs = 1000;
+    private const double DropoutBeats   = 3.0;
     private readonly DispatcherTimer _audioHoldTimer;
+
+    // Tempo-scaled HasAudio hold (see _audioHoldTimer). bpm <= 0 (no lock yet) ⇒ the
+    // full ceiling, since there is no period to scale to. internal for unit testing.
+    internal static int HoldMsForBpm(int bpm)
+        => bpm <= 0
+            ? AudioHoldMaxMs
+            : (int)Math.Clamp(DropoutBeats * 60000.0 / bpm, AudioHoldMinMs, AudioHoldMaxMs);
 
     // Drives the visual beat pulse (ring + live dot) from the detected BPM rather
     // than from raw onset events. Onsets fire on every kick/snare transient, which
@@ -206,7 +229,7 @@ public partial class SoundModeViewModel : ObservableObject
         _beatTickTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
         _beatTickTimer.Tick += OnBeatTickTimerTick;
 
-        _audioHoldTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(AudioHoldMs) };
+        _audioHoldTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(AudioHoldMaxMs) };
         _audioHoldTimer.Tick += OnAudioHoldTimerTick;
 
         _pulseTimer = new DispatcherTimer();
@@ -444,7 +467,10 @@ public partial class SoundModeViewModel : ObservableObject
             // off LiveBpm so the ring/dot match the detected BPM rather than the (often
             // denser and jittery) raw onset rate.
             HasAudio = true;
+            // Rearm the dropout window scaled to the current tempo, so a fast source
+            // releases HasAudio within a few missed beats instead of a fixed 4 s.
             _audioHoldTimer.Stop();
+            _audioHoldTimer.Interval = TimeSpan.FromMilliseconds(HoldMsForBpm(LiveBpm));
             _audioHoldTimer.Start();
         });
     }

@@ -31,6 +31,32 @@ real 30 passes immediately while the 37 is gated, and 5 cycles outlasts the ~4-c
 so the settle-down reading discards it. Cost: genuine large up-jumps adopt ~1 s later (the
 overshoot and a real jump are indistinguishable until the overshoot falls back).
 
+Follow-up 2 — response lag (capture `osf-20260605-184322.txt`). Two transition lags
+surfaced once the overshoot was fixed:
+- **Stop lag ✅ Resolved.** When a fast source stopped, the device took ~4 s to stop. Cause:
+  the device is gated on `SoundModeViewModel.HasAudio`, which was held a **fixed 4000 ms**
+  after the last beat (sized for one 15 BPM period to bridge a slow click's inter-tick
+  silence). The hold is now **tempo-relative** (`HoldMsForBpm`): `DropoutBeats (3) × beat
+  period`, clamped to `[1000, 4000] ms`. At 120 BPM that is ~1.5 s; at ≤ 40 BPM it stays at
+  the 4000 ms ceiling, so slow sources are unchanged. Safe against missed onsets because the
+  hold's expiry re-reads the capture state (`HasAudio = state == Running`), so a hold lapsing
+  while audio still plays keeps `HasAudio` true — the device only stops once the hold lapses
+  **and** the capture is RMS-silent (NoSignal, ~0.5–1.5 s). Floor 1000 ms keeps the hold above
+  the service's 500 ms silence-RMS window. See `SoundModeHoldTests`.
+- **Increase lag ✅ Resolved.** A genuine large up-jump (90→120, 120→180, 180→240) used to wait
+  the full 5-cycle confirmation (~2.5 s ≈ 10 ticks at 240 BPM) even though the new tempo was
+  already corroborated. The estimator now reports `HarmonicSupport` (`ac[2L]/ac[L]`, read from
+  a small neighbourhood around `2L` to survive odd-lag tempos like 181 BPM), and `TempoSmoother`
+  adopts a large up-jump immediately when support ≥ `TempoCorroborationMin` (0.25). Validated on
+  captures `osf-20260605-184322` and `-191543`: every genuine jump adopts on the first cycle it
+  appears (support ≥ 0.3), while the 37 BPM overshoot (support 0.00) still takes the slow path
+  and is rejected. Residual lag is just the estimator lock (~1 new beat period — inherent).
+  See `documentation/SoundModeImplementation.md` (corroborated large up-jumps) and
+  `TempoSmootherTests` / `AutocorrelationTempoEstimatorTests`.
+- **>240 BPM reads as a subharmonic — still open.** A ~300 BPM click (0.20 s) is read as 150
+  (its 2× lag) because `maxBpm = 240` makes the true lag fall below `lagMin`. Decide: raise the
+  ceiling vs. clamp-and-document (the device cannot actuate that fast regardless).
+
 ## 3. Device calibration
 Issue: It seems like the device response is not fully linear to the percentage input.
 Goal: Set up a device calibration curve based on real world measurements (mapping input percentage to observed thrusting tempo).
@@ -41,3 +67,6 @@ When running the application on other computers, i want to avoid that windows fl
 
 ## 5. Sound mode visualizer beat display 
 Make the sound mode visualizer beats align with the detected beats (instead of the calculated bpm).
+
+## 6. Background image
+The background image seems to jump slightly between the scanning screen and the device listing screen.

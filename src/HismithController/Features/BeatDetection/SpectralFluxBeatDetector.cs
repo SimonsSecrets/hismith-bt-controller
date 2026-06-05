@@ -92,6 +92,14 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     private const int    TempoUpConfirmCycles    = 5;    // ≈ 2.5 s; outlasts the ~4-cycle overshoot
     private const int    TempoConfirmToleranceBpm = 8;   // successive candidates within this ⇒ same tempo
 
+    // A large up-jump whose estimator HarmonicSupport clears this is adopted immediately
+    // instead of waiting out TempoUpConfirmCycles — a genuine speed-up's new period
+    // already repeats in the window (support ≳ 0.3 on the first cycle it appears), whereas
+    // the one-off transition gap sits at ~0, so it still takes the slow path and is
+    // rejected. 0.25 leaves margin below observed genuine first-cycle support and well
+    // above the gap. Tuned against captures osf-20260605-184322 / -191543.
+    private const double TempoCorroborationMin   = 0.25;
+
     // ── Ring buffer ───────────────────────────────────────────────────────────
     // _ringWritePos points to the oldest sample (= next slot to overwrite).
     // After each write, _ringWritePos = (pos + 1) % FftSize, so the extraction
@@ -205,10 +213,11 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
             preferredSigma:    settings.PreferredBpmSigma,
             recencyTauSeconds: settings.RecencyTauSeconds);
         _tempoSmoother = new TempoSmoother(
-            jumpUpFactor:        TempoUpJumpFactor,
-            jumpUpMinBpm:        TempoUpJumpMinBpm,
-            confirmCycles:       TempoUpConfirmCycles,
-            confirmToleranceBpm: TempoConfirmToleranceBpm);
+            jumpUpFactor:           TempoUpJumpFactor,
+            jumpUpMinBpm:           TempoUpJumpMinBpm,
+            confirmCycles:          TempoUpConfirmCycles,
+            confirmToleranceBpm:    TempoConfirmToleranceBpm,
+            corroborationThreshold: TempoCorroborationMin);
 
         _captureSink = captureSink;
         _captureSink.WriteHeader(new OsfCaptureHeader(
@@ -226,7 +235,8 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
             TempoUpJumpFactor:        TempoUpJumpFactor,
             TempoUpJumpMinBpm:        TempoUpJumpMinBpm,
             TempoUpConfirmCycles:     TempoUpConfirmCycles,
-            TempoConfirmToleranceBpm: TempoConfirmToleranceBpm));
+            TempoConfirmToleranceBpm: TempoConfirmToleranceBpm,
+            TempoCorroborationMin:    TempoCorroborationMin));
 
         // Lifetime matches the app; unsubscribing / disposal is not needed.
         _audioRunning = audioService.State == AudioCaptureState.Running;
@@ -438,8 +448,10 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
         var est = _tempoEstimator.Analyze(snapshot, HopMs, fold: false);
         // Gate the published tempo: a large upward jump (e.g. the transient spike while
         // the input tempo changes) must be confirmed over a few cycles before it is
-        // applied; decreases and small changes pass straight through. See TempoSmoother.
-        _autoBpm  = _tempoSmoother.Update(est.Bpm);
+        // applied UNLESS its harmonic support shows the new period already repeats (a
+        // genuine speed-up, adopted at once); decreases and small changes pass straight
+        // through. See TempoSmoother.
+        _autoBpm  = _tempoSmoother.Update(est.Bpm, est.HarmonicSupport);
         _autoConf = est.Confidence;
 
         // Diagnostic capture: records the raw (pre-smoother) estimate alongside the published

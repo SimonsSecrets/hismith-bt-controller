@@ -287,10 +287,25 @@ The filter is deliberately **asymmetric**:
   be delayed (the device should not keep running fast), and small drift needs no gating.
 - **A large upward jump** — one that clears **both** a relative factor (`> +25 %`) **and**
   an absolute floor (`> +14 BPM`) — becomes a *pending candidate* and is adopted only after
-  it persists for **5 consecutive cycles** (`TempoUpConfirmCycles`, ≈ 2.5 s). A spike that
-  fades before then is discarded and the previous tempo is held. This is the literal reading
-  of the requirement "large jumps up … need more than two rapid-succession ticks to be
-  applied."
+  it persists for **5 consecutive cycles** (`TempoUpConfirmCycles`, ≈ 2.5 s) **unless it is
+  already corroborated** (see below). A spike that fades before then is discarded and the
+  previous tempo is held. This is the literal reading of the requirement "large jumps up …
+  need more than two rapid-succession ticks to be applied."
+- **Corroborated large up-jumps are adopted immediately** (`TempoCorroborationMin = 0.25`).
+  The 5-cycle wait above is the *uncorroborated* path; it exists only to outlast a one-off
+  transition gap, which is indistinguishable from a real speed-up *by timing alone*. But the
+  estimator also reports `HarmonicSupport` — `ac[2L]/ac[L]`, how strongly the chosen period
+  repeats (a real tempo correlates at twice its lag; a single interval has ~0 there). When a
+  large up-jump's support clears the threshold, the repetition **is** the confirmation, so it
+  is adopted on the first cycle it appears instead of after ~2.5 s. Validated against
+  `captures/osf-20260605-184322.txt` (90→120, 120→180) and `-191543.txt` (180→240): support
+  is ≥ 0.3 on the first cycle of each genuine jump, vs `0.00` for the 37 BPM overshoot, which
+  therefore still takes the slow path and is rejected. The support is read from a small
+  neighbourhood around `2L` (not the exact doubled lag): for an odd-lag tempo like 181 BPM
+  (`L = 57`) the true half-tempo peak sits at ≈ 113.5, so `ac[114]` lands on the flank and
+  understates support — the same integer-rounding fix the subharmonic search uses. **Floor**
+  still inevitable: a faster tempo cannot be corroborated until its period has occurred twice
+  (~1 s at 120 BPM), so the lag shrinks from ~2.5 s to about one new beat period, not zero.
 - **Floor and confirm count were re-tuned** (was `+20 BPM` / 3 cycles) against a captured
   20→30 BPM metronome step (`captures/osf-20260605-125501.txt`). Bumping the input tempo
   injects one anomalously short transition interval — a single 1.6 s gap → a spurious **~37
