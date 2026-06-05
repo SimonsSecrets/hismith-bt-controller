@@ -74,5 +74,6 @@ When running the application on other computers, i want to avoid that windows fl
 ## 5. Sound mode visualizer beat display 
 Make the sound mode visualizer beats align with the detected beats (instead of the calculated bpm).
 
-## 6. Background image
-The background image seems to jump slightly between the scanning screen and the device listing screen.
+## 6. Sound mode safety ramp
+Extermely large jumps (up) in sound mode should ramp up the device instead of be instantaneous. 
+Jumps up of 80bpm of more should trigger this safety behaviour. The ramp should be smooth and gradual, with a maximum duration of 5 seconds.

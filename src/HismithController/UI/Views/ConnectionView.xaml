@@ -192,7 +192,7 @@
                 <Grid>
                     <!-- Margin compensates for the border's 40/28 padding so the logo bleeds
                          96/40 past the frame edge (design .frame-watermark right:-96, bottom:-40). -->
-                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-136,-68" />
+                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-160,-68" />
                 <DockPanel>
                     <!-- Top section -->
                     <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center">
@@ -303,7 +303,7 @@
                 <Grid>
                     <!-- Margin compensates for the border's 40/28 padding so the logo bleeds
                          96/40 past the frame edge (design .frame-watermark right:-96, bottom:-40). -->
-                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-136,-68" />
+                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-160,-68" />
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center">
                         <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
@@ -353,7 +353,7 @@
                 <Grid>
                     <!-- Margin compensates for the border's 40/28 padding so the logo bleeds
                          96/40 past the frame edge (design .frame-watermark right:-96, bottom:-40). -->
-                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-136,-68" />
+                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-160,-68" />
                 <StackPanel HorizontalAlignment="Center">
                     <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
                         <Ellipse Fill="{DynamicResource RoseTintBrush}" />
@@ -391,7 +391,7 @@
                 <Grid>
                     <!-- Margin compensates for the border's 40/28 padding so the logo bleeds
                          96/40 past the frame edge (design .frame-watermark right:-96, bottom:-40). -->
-                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-136,-68" />
+                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-160,-68" />
                 <StackPanel HorizontalAlignment="Center">
                     <!-- Spinner: a static rose-soft track ring with a rose 90° arc rotating over it
                          (design .spinner: 3px rose-soft border, border-top-color rose, spin 0.9s). -->
@@ -592,7 +592,7 @@
                 <Grid>
                     <!-- Margin compensates for the border's 40/28 padding so the logo bleeds
                          96/40 past the frame edge (design .frame-watermark right:-96, bottom:-40). -->
-                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-136,-68" />
+                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-160,-68" />
                 <StackPanel HorizontalAlignment="Center">
                     <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
                         <Ellipse Fill="{DynamicResource CoralTintBrush}" />
@@ -633,7 +633,7 @@
                 <Grid>
                     <!-- Margin compensates for the border's 40/28 padding so the logo bleeds
                          96/40 past the frame edge (design .frame-watermark right:-96, bottom:-40). -->
-                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-136,-68" />
+                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-160,-68" />
                 <StackPanel HorizontalAlignment="Center">
                     <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
                         <Ellipse Fill="{DynamicResource CoralTintBrush}" />
@@ -671,7 +671,7 @@
                 <Grid>
                     <!-- Margin compensates for the border's 40/28 padding so the logo bleeds
                          96/40 past the frame edge (design .frame-watermark right:-96, bottom:-40). -->
-                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-136,-68" />
+                    <Image Style="{StaticResource FrameWatermark}" Margin="0,0,-160,-68" />
                 <StackPanel HorizontalAlignment="Center">
                     <Grid Width="80" Height="80" Margin="0,0,0,18" HorizontalAlignment="Center">
                         <Ellipse Fill="{DynamicResource CoralTintBrush}" />
