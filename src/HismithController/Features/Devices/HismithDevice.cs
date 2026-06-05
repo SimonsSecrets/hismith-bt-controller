@@ -6,37 +6,32 @@ namespace HismithController.Devices;
 public sealed class HismithDevice : IDevice
 {
     private readonly IBleDeviceService _ble;
+    private readonly DeviceCalibration _calibration;
 
     public HismithDevice(
         string displayName,
-        int maxBpm,
+        DeviceCalibration calibration,
         IReadOnlyList<SpeedPreset> presets,
         IBleDeviceService ble)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(maxBpm, 1);
+        ArgumentNullException.ThrowIfNull(calibration);
         DisplayName = displayName;
-        MaxBpm = maxBpm;
+        _calibration = calibration;
         Presets = presets;
         _ble = ble;
     }
 
     public string DisplayName { get; }
 
-    public int MaxBpm { get; }
+    public int MaxBpm => _calibration.MaxBpm;
 
     public IReadOnlyList<SpeedPreset> Presets { get; }
 
-    public int BpmToPercent(int bpm)
-    {
-        var clamped = Math.Clamp(bpm, 0, MaxBpm);
-        return (int)Math.Round(clamped * 100.0 / MaxBpm);
-    }
+    // Both directions delegate to the device-model calibration curve so the speed byte
+    // sent to the hardware reflects its real (non-linear) tempo response — see §3.
+    public int BpmToPercent(int bpm) => _calibration.BpmToPercent(bpm);
 
-    public int PercentToBpm(int percent)
-    {
-        var clamped = Math.Clamp(percent, 0, 100);
-        return (int)Math.Round(clamped * MaxBpm / 100.0);
-    }
+    public int PercentToBpm(int percent) => _calibration.PercentToBpm(percent);
 
     public Task SetTargetBpmAsync(int bpm, CancellationToken cancellationToken = default)
     {
@@ -77,23 +72,31 @@ public static class HismithDeviceCatalog
         new("Destroyed", 100),
     ];
 
-    // Max BPM for the AK Series (Pro 1); shared by the real catalog entry and the demo device
-    // so both describe the same hardware envelope.
-    public const int Pro1MaxBpm = 240;
+    // Empirically measured speed→tempo response for the AK Series (Pro 1), per OpenPoints §3.
+    // The device's tempo is sub-linear in the low range and saturates near the top, so a plain
+    // linear percent scale overshoots the requested BPM. Shared by the real catalog entry and
+    // the demo device so both describe the same hardware envelope; its top point (240) is the
+    // Pro 1 ceiling that drives the app-wide BPM scale.
+    private static readonly DeviceCalibration Pro1Calibration = new(
+    [
+        (0, 0), (10, 38), (20, 62), (30, 85), (40, 112), (50, 136),
+        (60, 160), (70, 186), (80, 213), (90, 234), (100, 240),
+    ]);
 
     // Demo device: a DemoDevice configured exactly like the AK Series (Pro 1) so every mode
     // behaves identically, but its BLE writes are no-ops (logged only). Used by the offline
     // "demo mode" exploration path, which never opens a real BLE link.
     public static DemoDevice CreateDemoDevice(ILogger<DemoDevice> logger) =>
-        new("Hismith Pro 1 (AK Series) - DEMO", Pro1MaxBpm, Pro1Presets, logger);
+        new("Hismith Pro 1 (AK Series) - DEMO", Pro1Calibration, Pro1Presets, logger);
 
     public static HismithDevice? CreateForProductCode(ushort productCode, IBleDeviceService ble) =>
         productCode switch
         {
             MockBleDeviceService.ProductCodeAkSeries
-                => new HismithDevice("Hismith Pro 1 (AK Series)", Pro1MaxBpm, Pro1Presets, ble),
+                => new HismithDevice("Hismith Pro 1 (AK Series)", Pro1Calibration, Pro1Presets, ble),
+            // No measured curve for the Mini yet — fall back to a linear 0→100 BPM mapping.
             MockBleDeviceService.ProductCodeMockMini
-                => new HismithDevice("Hismith Mini (mock)", 100, MiniPresets, ble),
+                => new HismithDevice("Hismith Mini (mock)", DeviceCalibration.Linear(100), MiniPresets, ble),
             _ => null,
         };
 

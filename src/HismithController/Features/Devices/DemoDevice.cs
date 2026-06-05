@@ -10,38 +10,31 @@ namespace HismithController.Devices;
 public sealed class DemoDevice : IDevice
 {
     private readonly ILogger<DemoDevice> _logger;
+    private readonly DeviceCalibration _calibration;
 
     public DemoDevice(
         string displayName,
-        int maxBpm,
+        DeviceCalibration calibration,
         IReadOnlyList<SpeedPreset> presets,
         ILogger<DemoDevice> logger)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(maxBpm, 1);
+        ArgumentNullException.ThrowIfNull(calibration);
         DisplayName = displayName;
-        MaxBpm = maxBpm;
+        _calibration = calibration;
         Presets = presets;
         _logger = logger;
     }
 
     public string DisplayName { get; }
 
-    public int MaxBpm { get; }
+    public int MaxBpm => _calibration.MaxBpm;
 
     public IReadOnlyList<SpeedPreset> Presets { get; }
 
-    // Same clamp/round mapping as HismithDevice so the demo slider tracks identically.
-    public int BpmToPercent(int bpm)
-    {
-        var clamped = Math.Clamp(bpm, 0, MaxBpm);
-        return (int)Math.Round(clamped * 100.0 / MaxBpm);
-    }
+    // Same calibration as HismithDevice so the demo slider tracks identically.
+    public int BpmToPercent(int bpm) => _calibration.BpmToPercent(bpm);
 
-    public int PercentToBpm(int percent)
-    {
-        var clamped = Math.Clamp(percent, 0, 100);
-        return (int)Math.Round(clamped * MaxBpm / 100.0);
-    }
+    public int PercentToBpm(int percent) => _calibration.PercentToBpm(percent);
 
     public Task SetTargetBpmAsync(int bpm, CancellationToken cancellationToken = default)
     {

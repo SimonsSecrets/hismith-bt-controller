@@ -63,9 +63,30 @@ surfaced once the overshoot was fixed:
   `osf-20260605-184322` (the 300 region now reads ~301) with no regression on 20–240 BPM tempos
   or the stop. See `AutocorrelationTempoEstimatorTests.Analyze_FastTrainAboveCeiling_*`.
 
-## 3. Device calibration
+## 3. Device calibration ✅ Resolved
 Issue: It seems like the device response is not fully linear to the percentage input.
 Goal: Set up a device calibration curve based on real world measurements (mapping input percentage to observed thrusting tempo).
+Resolution: Added `DeviceCalibration` (`Features/Devices/DeviceCalibration.cs`), a device-model-specific
+piecewise-linear curve of measured (percent, bpm) points. `IDevice.BpmToPercent` (the device-send path)
+now inverts the curve — a target tempo maps to the speed percent that *actually* produces it — and
+`PercentToBpm` evaluates it forward; `MaxBpm` is the curve's top point. The old linear `bpm*100/maxBpm`
+mapping, which was duplicated in `HismithDevice` and `DemoDevice`, is gone; both now delegate to the
+calibration. The Pro 1 (AK Series) uses the measured curve below (e.g. 120 BPM → 43 % instead of the
+linear 50 %); models without measurements use `DeviceCalibration.Linear(maxBpm)`, which reproduces the
+old mapping exactly. See `DeviceCalibrationTests`.
+
+The following device mapping was empirically determined for the Hismith Pro 1 series:
+- 0% input: 0 BPM
+- 10% input: 38 BPM
+- 20% input: 62 BPM
+- 30% input: 85 BPM
+- 40% input: 112 BPM
+- 50% input: 136 BPM
+- 60% input: 160 BPM
+- 70% input: 186 BPM
+- 80% input: 213 BPM
+- 90% input: 234 BPM
+- 100% input: 240 BPM
 
 ## 4. Security
 Goal: Scan the whole application for any security concerns/issues and make sure it is trustworthy on other computers.
