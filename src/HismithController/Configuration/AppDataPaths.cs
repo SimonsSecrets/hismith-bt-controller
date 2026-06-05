@@ -13,6 +13,7 @@ namespace HismithController.Configuration;
 public sealed class AppDataPaths
 {
     private const string LogsFolderName = "logs";
+    private const string CapturesFolderName = "captures";
     private const string UserSettingsFileName = "user-settings.json";
 
     public AppDataPaths()
@@ -23,6 +24,9 @@ public sealed class AppDataPaths
     public string DataFolder { get; private set; }
 
     public string LogsFolder => Path.Combine(DataFolder, LogsFolderName);
+
+    // Diagnostic OSF captures (--capture-osf). See IOsfCaptureSink.
+    public string CapturesFolder => Path.Combine(DataFolder, CapturesFolderName);
 
     public string UserSettingsPath => Path.Combine(DataFolder, UserSettingsFileName);
 

@@ -303,6 +303,30 @@ The four thresholds are `private const` in `SpectralFluxBeatDetector` (passed in
 smoother's ctor) — fixed in code, **not** user-configurable, matching the `OnsetMultiplier`
 convention. Guarded by `TempoSmootherTests`.
 
+### 5.7 Capturing a real case for replay (diagnostics)
+
+OpenPoints §2 can still recur on real input that the synthetic tests don't cover, so the
+detector can record its actual OSF + per-cycle tempo output to a **replayable text file**.
+This is a diagnostic seam, **off by default and zero-cost** when unused.
+
+- **Turn on**: pass `--capture-osf` (writes a timestamped file under the app data
+  `captures/` folder) or `--capture-osf=<path>` (resolved in `App.xaml.cs`,
+  `ResolveOsfCapturePath`). The flag sets `AppSettings.OsfCapturePath`, which selects
+  `OsfFileCaptureSink` over the `NullOsfCaptureSink` in DI.
+- **What it records** (`IOsfCaptureSink` / `OsfFileCaptureSink`): a header with every
+  estimator/smoother parameter, one `OSF <hopIndex> <flux> <running>` line per FFT hop, and
+  one `CYCLE <head> <rawBpm> <conf> <sparsity> <smoothedBpm>` line per 500 ms tempo cycle.
+  `rawBpm` is the estimate **before** the smoother — exactly the value that spikes.
+- **Threading**: `RecordHop` runs on the audio thread but only appends to an in-memory
+  buffer inside the existing `_osfLock` (no disk I/O); `RecordCycle` drains that buffer to
+  disk on the tempo-timer thread. The audio-thread budget (§4) is preserved.
+- **Replay**: `dotnet run --project tools/OsfReplay -- <capture.txt>` reconstructs each
+  cycle's window from the continuous flux stream (`flux[head-osfLen .. head]`), re-runs the
+  **real** `AutocorrelationTempoEstimator` + `TempoSmoother` (the tool compiles those exact
+  source files, no copy), and prints a per-cycle table; matching `rplRaw == recRaw` confirms
+  a faithful, deterministic replay. CLI overrides (`--tau`, `--osf-window`, `--jump-factor`,
+  …) let you A/B parameter changes against the same captured case.
+
 ---
 
 ## 6. The regime classifier — when to fold (and why it is currently disabled)

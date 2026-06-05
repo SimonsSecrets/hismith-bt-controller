@@ -85,6 +85,11 @@ public partial class App : Application
         // share one location for the whole process (a folder change applies after a restart).
         var appDataPaths = new AppDataPaths();
 
+        // --capture-osf [or --capture-osf=<path>]: diagnostic recording of the sound-mode tempo
+        // pipeline (OpenPoints.md item 2). Bare flag ⇒ a timestamped file under the captures
+        // folder; an explicit path after '=' overrides it.
+        settings.OsfCapturePath = ResolveOsfCapturePath(e.Args, appDataPaths);
+
         var services = new ServiceCollection();
         services.AddLogging(builder =>
         {
@@ -111,6 +116,14 @@ public partial class App : Application
             services.AddSingleton<IAudioCaptureService, MockAudioCaptureService>();
         else
             services.AddSingleton<IAudioCaptureService, WasapiLoopbackAudioCaptureService>();
+
+        // Registered before the detector so DI can inject it. Disposed with the provider on exit
+        // (OsfFileCaptureSink flushes/closes its file then), so a final partial cycle isn't lost.
+        if (settings.OsfCapturePath is { } capturePath)
+            services.AddSingleton<IOsfCaptureSink>(new OsfFileCaptureSink(capturePath));
+        else
+            services.AddSingleton<IOsfCaptureSink, NullOsfCaptureSink>();
+
         services.AddSingleton<SpectrumAnalyzer>();
         services.AddSingleton<IBeatDetector, SpectralFluxBeatDetector>();
         services.AddSingleton<IConnectedDeviceService, ConnectedDeviceService>();
@@ -129,6 +142,30 @@ public partial class App : Application
 
         var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
         mainWindow.Show();
+    }
+
+    // Returns the OSF capture file path if --capture-osf was passed, else null. Accepts a bare
+    // flag (timestamped default file) or --capture-osf=<path> for an explicit location.
+    private static string? ResolveOsfCapturePath(string[] args, AppDataPaths paths)
+    {
+        const string flag = "--capture-osf";
+        foreach (var arg in args)
+        {
+            if (arg.Equals(flag, StringComparison.OrdinalIgnoreCase))
+            {
+                var name = $"osf-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.txt";
+                return System.IO.Path.Combine(paths.CapturesFolder, name);
+            }
+
+            if (arg.StartsWith(flag + "=", StringComparison.OrdinalIgnoreCase))
+            {
+                var value = arg[(flag.Length + 1)..].Trim().Trim('"');
+                if (!string.IsNullOrWhiteSpace(value))
+                    return System.IO.Path.GetFullPath(value);
+            }
+        }
+
+        return null;
     }
 
     public void ApplyTheme(bool isDark)

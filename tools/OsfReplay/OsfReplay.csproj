@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Plain net8.0 (no WPF/Windows TFM): the linked sources are pure and have no
+         Windows dependency, so the replay tool runs headless on any .NET 8 runtime. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>OsfReplay</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Compile the REAL estimator/smoother sources (rather than a ProjectReference, which would
+       drag in the WPF main project) so replay uses exactly the production algorithm with no
+       risk of a drifting copy. -->
+  <ItemGroup>
+    <Compile Include="..\..\src\HismithController\Features\BeatDetection\AutocorrelationTempoEstimator.cs"
+             Link="Production\AutocorrelationTempoEstimator.cs" />
+    <Compile Include="..\..\src\HismithController\Features\BeatDetection\TempoSmoother.cs"
+             Link="Production\TempoSmoother.cs" />
+  </ItemGroup>
+
+</Project>

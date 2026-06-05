@@ -64,6 +64,47 @@ Quick summary (`SpectralFluxBeatDetector.cs`):
   implementation doc.
 - The old IBI-median `BpmEstimator` has been removed.
 
+### Diagnosing tempo issues with OSF capture/replay
+
+When a sound-mode tempo problem shows up on real audio that the synthetic tests don't cover
+(e.g. OpenPoints §2 — sudden BPM spikes on a metronome tempo change), capture the actual
+onset-strength envelope and replay it deterministically instead of guessing from the symptom.
+Full reference: §5.7 of [documentation/SoundModeImplementation.md](documentation/SoundModeImplementation.md).
+
+**1. Capture a real case** (ask the user to run it — it needs live audio + a window):
+```bash
+dotnet run --project src/HismithController/HismithController.csproj -- --capture-osf
+```
+Enter Sound Mode, reproduce the problem (play the metronome, change its tempo), then quit.
+A timestamped file is written to `%LOCALAPPDATA%\HismithController\captures\osf-<timestamp>.txt`
+(use `--capture-osf=<path>` for an explicit location). Capture is **off by default and
+zero-cost** otherwise (`NullOsfCaptureSink`); it adds no audio-thread disk I/O.
+
+**2. Read the file.** It is plain text:
+- A header block (`key=value`) recording every estimator/smoother parameter the run used.
+- `OSF <hopIndex> <flux> <audioRunning>` — one line per ~5.8 ms FFT hop (the raw envelope).
+- `CYCLE <head> <rawBpm> <confidence> <sparsity> <smoothedBpm>` — one per 500 ms tempo cycle.
+  **`rawBpm` is the estimate *before* `TempoSmoother`** (the value that spikes); `smoothedBpm`
+  is what was published to `CurrentBpm`. `head` is the OSF hop index at that cycle.
+
+**3. Replay it** to reproduce and bisect the problem:
+```bash
+dotnet run --project tools/OsfReplay -- <capture.txt>
+```
+Prints a per-cycle table (`recRaw` vs `rplRaw`, `recSm` vs `rplSm`, plus a `SPIKE` flag). The
+tool compiles the *real* `AutocorrelationTempoEstimator` + `TempoSmoother` sources, so
+`rplRaw == recRaw` on every cycle confirms a faithful, deterministic replay — your starting
+point before changing anything.
+
+**4. Diagnose & A/B fixes.** Read which stage the spike comes from:
+- spike in **`rawBpm`** ⇒ the autocorrelation estimate itself is wrong (look at the OSF around
+  that `head`, and at recency weighting / subharmonic rejection).
+- `rawBpm` clean but **`smoothedBpm`** wrong ⇒ the `TempoSmoother` gate is mistuned.
+
+Then re-run the replay with override flags to test parameter changes against the *same*
+captured case before touching code: `--tau <s>`, `--osf-window <s>`, `--jump-factor <f>`,
+`--jump-min <bpm>`, `--confirm-cycles <n>`, `--confirm-tol <bpm>`.
+
 ## Hismith BLE Protocol
 
 **Target device: Hismith Pro 1 (model AK-01, AK Series, product code 1001)**

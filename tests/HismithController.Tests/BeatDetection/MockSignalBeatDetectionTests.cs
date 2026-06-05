@@ -39,7 +39,7 @@ public class MockSignalBeatDetectionTests
     public void CleanMetronome_LocksOntoTrueTempo(int bpm)
     {
         var audio = new FakeAudioService();
-        var detector = new SpectralFluxBeatDetector(audio, new AppSettings());
+        var detector = new SpectralFluxBeatDetector(audio, new AppSettings(), new NullOsfCaptureSink());
 
         int beatCount = 0;
         detector.BeatDetected += (_, _) => beatCount++;
@@ -104,7 +104,7 @@ public class MockSignalBeatDetectionTests
         // keeps publishing near-silent frames in the NoSignal state, and the adaptive
         // threshold would otherwise collapse and emit phantom beats on noise.
         var audio = new FakeAudioService();
-        var detector = new SpectralFluxBeatDetector(audio, new AppSettings());
+        var detector = new SpectralFluxBeatDetector(audio, new AppSettings(), new NullOsfCaptureSink());
         int beatCount = 0;
         detector.BeatDetected += (_, _) => beatCount++;
 
@@ -119,7 +119,7 @@ public class MockSignalBeatDetectionTests
     public void Stop_ResetsReportedBpm()
     {
         var audio = new FakeAudioService();
-        var detector = new SpectralFluxBeatDetector(audio, new AppSettings());
+        var detector = new SpectralFluxBeatDetector(audio, new AppSettings(), new NullOsfCaptureSink());
 
         // Lock onto 120 BPM, then stop the source.
         int periodSamples = SampleRate / 2; // 120 BPM

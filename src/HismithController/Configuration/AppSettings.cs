@@ -5,6 +5,11 @@ public sealed class AppSettings
     public bool UseMockBle { get; set; }
     public bool UseMockAudio { get; set; }
 
+    // When set (via --capture-osf), the beat detector records its onset-strength envelope and
+    // per-cycle tempo output to this text file for offline replay (OpenPoints.md item 2). Null
+    // ⇒ capture disabled. See IOsfCaptureSink / OsfFileCaptureSink and tools/OsfReplay.
+    public string? OsfCapturePath { get; set; }
+
     // ── Autocorrelation tempo estimator ─────────────────────────────────────────
     // Tempo is derived from the periodicity of the onset-strength envelope via
     // autocorrelation, not from discrete inter-beat intervals: real music places

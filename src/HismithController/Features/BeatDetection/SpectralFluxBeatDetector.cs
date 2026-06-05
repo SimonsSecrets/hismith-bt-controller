@@ -136,6 +136,14 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     // internally locked. See TempoSmoother.
     private readonly TempoSmoother _tempoSmoother;
 
+    // Diagnostic recorder for the OSF + per-cycle tempo output (OpenPoints.md item 2).
+    // NullOsfCaptureSink unless --capture-osf is set, so this is zero-cost by default.
+    private readonly IOsfCaptureSink _captureSink;
+
+    // Total OSF hops appended since start, written only on the audio thread under _osfLock.
+    // Snapshotted by the tempo timer as the capture's head index (see OnTempoTimer).
+    private long _osfTotalHops;
+
     // Recomputes tempo every TempoIntervalMs off the audio thread so the O(lag×n)
     // autocorrelation never runs inside the <5 ms/hop audio budget.
     private readonly System.Threading.Timer _tempoTimer;
@@ -167,7 +175,7 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
 
     public event EventHandler<BeatEventArgs>? BeatDetected;
 
-    public SpectralFluxBeatDetector(IAudioCaptureService audioService, AppSettings settings)
+    public SpectralFluxBeatDetector(IAudioCaptureService audioService, AppSettings settings, IOsfCaptureSink captureSink)
     {
         _hannWindow      = BuildHannWindow(FftSize);
 
@@ -187,6 +195,24 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
             jumpUpMinBpm:        TempoUpJumpMinBpm,
             confirmCycles:       TempoUpConfirmCycles,
             confirmToleranceBpm: TempoConfirmToleranceBpm);
+
+        _captureSink = captureSink;
+        _captureSink.WriteHeader(new OsfCaptureHeader(
+            HopMs:                    HopMs,
+            SampleRate:               SampleRate,
+            OsfLen:                   _osf.Length,
+            OsfWindowSeconds:         settings.OsfWindowSeconds,
+            MinBpm:                   MinBpm,
+            MaxBpm:                   MaxBpm,
+            PreferredCenter:          settings.PreferredBpmCenter,
+            PreferredSigma:           settings.PreferredBpmSigma,
+            RecencyTauSeconds:        settings.RecencyTauSeconds,
+            SparsityMetronomeMin:     settings.SparsityMetronomeMin,
+            SparsityDenseMax:         settings.SparsityDenseMax,
+            TempoUpJumpFactor:        TempoUpJumpFactor,
+            TempoUpJumpMinBpm:        TempoUpJumpMinBpm,
+            TempoUpConfirmCycles:     TempoUpConfirmCycles,
+            TempoConfirmToleranceBpm: TempoConfirmToleranceBpm));
 
         // Lifetime matches the app; unsubscribing / disposal is not needed.
         _audioRunning = audioService.State == AudioCaptureState.Running;
@@ -300,6 +326,10 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
             _osf[_osfWritePos] = flux;
             _osfWritePos = (_osfWritePos + 1) % _osf.Length;
             if (_osfCount < _osf.Length) _osfCount++;
+            _osfTotalHops++;
+            // Diagnostic capture: buffer-only, inside the lock so the recorder needs no
+            // separate audio-thread synchronisation. No-op unless --capture-osf is set.
+            _captureSink.RecordHop(flux, _audioRunning);
         }
 
         // Peak-picking: the onset candidate is the *previous* hop's flux, so we can
@@ -356,6 +386,7 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     private void OnTempoTimer(object? state)
     {
         double[] snapshot;
+        long headIndex;
         lock (_osfLock)
         {
             // Need at least a quarter window before the estimate is meaningful.
@@ -368,6 +399,9 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
             snapshot  = new double[count];
             for (int i = 0; i < count; i++)
                 snapshot[i] = _osf[(start + i) % size];
+            // Total hops appended so far: the capture's head index for this cycle, letting a
+            // replay reconstruct the exact snapshot from the continuous OSF stream.
+            headIndex = _osfTotalHops;
         }
 
         // OSF sparsity distinguishes a click train (mostly near-silent between clicks
@@ -393,6 +427,10 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
         // applied; decreases and small changes pass straight through. See TempoSmoother.
         _autoBpm  = _tempoSmoother.Update(est.Bpm);
         _autoConf = est.Confidence;
+
+        // Diagnostic capture: records the raw (pre-smoother) estimate alongside the published
+        // value, so a captured tempo spike can be replayed and attributed. No-op by default.
+        _captureSink.RecordCycle(headIndex, est.Bpm, est.Confidence, sparsity, _autoBpm);
     }
 
     // Fraction of OSF hops that are near-silent: below 15 % of the 99th-percentile
