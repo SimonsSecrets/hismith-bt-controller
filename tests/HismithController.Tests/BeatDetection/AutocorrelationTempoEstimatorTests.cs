@@ -167,6 +167,25 @@ public class AutocorrelationTempoEstimatorTests
         Assert.InRange(uniform.Analyze(osf, HopMs, fold: false).Bpm, 177, 183);
     }
 
+    // A periodicity faster than the ceiling has its fundamental lag below lagMin, so it can
+    // only be reported at a subharmonic. Production raises MaxBpm to 360 (above the device's
+    // 240 cap) so ~300 BPM music reports its true tempo instead of collapsing to ~150.
+    [Fact]
+    public void Analyze_FastTrainAboveCeiling_ReadsSubharmonicUntilCeilingRaised()
+    {
+        var train = ImpulseTrain(300);
+
+        // 240 ceiling: the 300 BPM fundamental is unreachable → locks the 2× subharmonic.
+        var capped = new AutocorrelationTempoEstimator(15.0, 240.0, 120.0, 0.5)
+            .Analyze(train, HopMs, fold: false);
+        Assert.InRange(capped.Bpm, 145, 155);
+
+        // 360 ceiling (production): the fundamental sits inside the range → true tempo.
+        var raised = new AutocorrelationTempoEstimator(15.0, 360.0, 120.0, 0.5)
+            .Analyze(train, HopMs, fold: false);
+        Assert.InRange(raised.Bpm, 290, 310);
+    }
+
     [Fact]
     public void Analyze_EmptyEnvelope_ReturnsZero()
     {

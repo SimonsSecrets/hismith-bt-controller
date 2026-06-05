@@ -53,9 +53,15 @@ surfaced once the overshoot was fixed:
   and is rejected. Residual lag is just the estimator lock (~1 new beat period — inherent).
   See `documentation/SoundModeImplementation.md` (corroborated large up-jumps) and
   `TempoSmootherTests` / `AutocorrelationTempoEstimatorTests`.
-- **>240 BPM reads as a subharmonic — still open.** A ~300 BPM click (0.20 s) is read as 150
-  (its 2× lag) because `maxBpm = 240` makes the true lag fall below `lagMin`. Decide: raise the
-  ceiling vs. clamp-and-document (the device cannot actuate that fast regardless).
+- **>240 BPM subharmonic ✅ Resolved.** A ~300 BPM click (0.20 s) read as 150 (its 2× lag)
+  because `maxBpm = 240` put the true lag below `lagMin`. Raised the estimator's `MaxBpm` to
+  **360** (well above the device's 240 cap) so the fundamental sits inside the range and ~300
+  BPM reports its true tempo. The device output is still clamped to 240 by `BeatToDeviceMapper`,
+  so this corrects the Music BPM readout and divided-rhythm math without driving the hardware
+  faster (chosen over clamp-and-document). 360 — not 300 — is required: at a 300 ceiling the
+  300 BPM fundamental lands on the boundary lag and still collapses to 150. Validated on
+  `osf-20260605-184322` (the 300 region now reads ~301) with no regression on 20–240 BPM tempos
+  or the stop. See `AutocorrelationTempoEstimatorTests.Analyze_FastTrainAboveCeiling_*`.
 
 ## 3. Device calibration
 Issue: It seems like the device response is not fully linear to the percentage input.

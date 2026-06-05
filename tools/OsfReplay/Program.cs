@@ -109,7 +109,7 @@ if (osfWindowOverride > 0.0)
 
 var estimator = new AutocorrelationTempoEstimator(
     minBpm:            H("minBpm", 15.0),
-    maxBpm:            H("maxBpm", 240.0),
+    maxBpm:            Opt("--max-bpm", H("maxBpm", 240.0)),
     preferredCenter:   H("preferredCenter", 120.0),
     preferredSigma:    H("preferredSigma", 0.5),
     recencyTauSeconds: tau);

@@ -208,9 +208,16 @@ This is the answer to the recurring question "does autocorrelation work for metr
 periodic input.
 
 ### 5.3 Autocorrelation details and why
-- **Lag range** spans `MinBpm = 15` to `MaxBpm = 240` BPM; `lagMax` is also capped at
+- **Lag range** spans `MinBpm = 15` to `MaxBpm = 360` BPM; `lagMax` is also capped at
   `N/2` so every lag has enough overlap. Note this `N/2` cap makes the *real* detectable
   floor ~20 BPM (a 15 BPM period exceeds half a 6 s window), independent of any weighting.
+  `MaxBpm = 360` deliberately exceeds the device's 240 BPM cap: a periodicity faster than
+  the ceiling has its fundamental lag below `lagMin` and can only be reported at a
+  subharmonic (a ~300 BPM click read as 150). Detecting to 360 reports ~300 BPM music at its
+  true tempo; the device output is still clamped to 240 by `BeatToDeviceMapper`, so this
+  fixes the readout and divided-rhythm math without driving the hardware faster. 360 (not
+  300) gives the 300 BPM fundamental headroom *inside* the range — right at the boundary the
+  peak still collapses to the 150 subharmonic. See OpenPoints.md item 2.
 - **Recency weighting (`RecencyTauSeconds`, default 2.5 s).** The autocorrelation runs over
   an exponentially recency-weighted copy of the OSF: weight `w[i] = exp(-(N−1−i)/τ)` with
   the newest sample at weight 1, folded in as `√w[i]·(x[i] − weightedMean)` so the existing
@@ -265,7 +272,7 @@ the **shortest** such lag (largest factor ⇒ fastest tempo ⇒ true fundamental
 ### 5.4 Octave folding and the preferred-tempo weighting
 Autocorrelation peaks at the true period *and its multiples*, so a 120 BPM song also
 peaks at 60 and 240. When folding is enabled, the estimator scores the harmonic set
-`{2×, 1×, ½×, ⅓×}` (those within 15–240) by `autocorrelation × preference`, where
+`{2×, 1×, ½×, ⅓×}` (those within 15–360) by `autocorrelation × preference`, where
 preference is a Gaussian in `log2(BPM)` centered on `PreferredBpmCenter = 120`
 (`PreferredBpmSigma = 0.5` octaves). This collapses half/double-tempo readings toward a
 musical range (~60–180) **without a hard cap**.
@@ -362,7 +369,7 @@ This is a diagnostic seam, **off by default and zero-cost** when unused.
 > **Status (current): octave folding is DISABLED.** `OnTempoTimer` calls the estimator
 > with `fold: false` for *all* input. The autocorrelation now runs unfolded everywhere;
 > subharmonic rejection (§5.5) handles the octave error that folding used to clean up,
-> and unfolded reporting keeps the true tempo across the full 15–240 BPM range for music
+> and unfolded reporting keeps the true tempo across the full 15–360 BPM range for music
 > and metronomes alike. The sparsity classifier below **still runs** but its `_foldDense`
 > result is **not consumed** — it is retained (not deleted) so folding can be re-enabled
 > later (e.g. behind a music/metronome UI toggle) by passing `fold: _foldDense` again.
@@ -372,7 +379,7 @@ This is a diagnostic seam, **off by default and zero-cost** when unused.
 
 Folding is right for dense music but **wrong for a fast metronome**: folding a 200 BPM
 click train would report 100, violating the requirement that metronome input keep its
-true tempo across the full 15–240 range. So the timer decides per-snapshot whether to
+true tempo across the full 15–360 range. So the timer decides per-snapshot whether to
 fold, using a content classifier.
 
 ### 6.1 The sparsity metric (and two rejected alternatives)

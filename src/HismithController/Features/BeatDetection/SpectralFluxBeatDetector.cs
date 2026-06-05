@@ -40,9 +40,16 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     // Time between consecutive hops / OSF samples: 256/44100 ≈ 5.805 ms.
     private const double HopMs = HopSize * 1000.0 / SampleRate;
 
-    // Supported tempo range, shared by both estimators.
+    // Supported tempo-detection range. MaxBpm exceeds the device's 240 BPM cap
+    // (SoundModeViewModel.FullScaleBpm, enforced by BeatToDeviceMapper) on purpose: a
+    // periodicity faster than the ceiling has its fundamental lag below lagMin and can
+    // only be reported at a subharmonic (e.g. a 300 BPM click read as 150). Detecting up
+    // to 360 lets ~300 BPM music report its true tempo — the device still caps at 240, so
+    // this fixes the readout and divided-rhythm math without driving the hardware faster.
+    // 360 (not 300) gives the 300 BPM fundamental headroom inside the range; right at the
+    // boundary the peak still collapses to the 150 subharmonic. See OpenPoints.md item 2.
     private const double MinBpm = 15.0;
-    private const double MaxBpm = 240.0;
+    private const double MaxBpm = 360.0;
 
     // Autocorrelation recompute cadence (off the audio thread).
     private const int TempoIntervalMs = 500;
