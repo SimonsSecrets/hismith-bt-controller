@@ -72,10 +72,24 @@ public sealed class SpectralFluxBeatDetector : IBeatDetector
     // rejects the transient upward spike during an input tempo change (OpenPoint 2):
     // a rise is "large" only when it clears BOTH the factor and the absolute floor,
     // and a large rise must persist for TempoUpConfirmCycles of the 500 ms tempo
-    // cycle (≈ 1.5 s) before it is adopted.
+    // cycle before it is adopted.
+    //
+    // The floor and confirm count are tuned against a real capture of a metronome
+    // stepped 20→30 BPM (captures/osf-20260605-…): bumping the input tempo injects
+    // one anomalously short transition interval (a 1.6 s gap → a spurious ~37 BPM
+    // read) that the recency-weighted autocorrelation latches onto for ~one new beat
+    // period before the true tempo fills the window. At 30 BPM that overshoot lasts
+    // 4 cycles, so:
+    //   • the floor must sit between the genuine step (+10 BPM here) and the overshoot
+    //     (+17 BPM) so the real 30 BPM passes through immediately while the 37 is gated;
+    //   • the confirm count must exceed the overshoot's 4 cycles so the settle-down
+    //     reading (30) arrives and discards the pending 37 before it can confirm.
+    // Cost: a *genuine* large up-jump is adopted ~1 s later (5 cycles vs 3). This is
+    // the inherent latency/accuracy trade — the only signal that an overshoot is
+    // spurious is that it falls back, which takes about one new beat period to observe.
     private const double TempoUpJumpFactor       = 1.25; // > +25 %  ⇒ candidate for gating
-    private const int    TempoUpJumpMinBpm       = 20;   // and > +20 BPM (both required)
-    private const int    TempoUpConfirmCycles    = 3;    // ≈ 1.5 s at TempoIntervalMs
+    private const int    TempoUpJumpMinBpm       = 14;   // and > +14 BPM (both required)
+    private const int    TempoUpConfirmCycles    = 5;    // ≈ 2.5 s; outlasts the ~4-cycle overshoot
     private const int    TempoConfirmToleranceBpm = 8;   // successive candidates within this ⇒ same tempo
 
     // ── Ring buffer ───────────────────────────────────────────────────────────

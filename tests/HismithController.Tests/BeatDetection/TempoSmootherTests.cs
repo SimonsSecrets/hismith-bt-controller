@@ -8,9 +8,9 @@ namespace HismithController.Tests.BeatDetection;
 // spike during an input tempo change (OpenPoint 2) never reaches CurrentBpm.
 public class TempoSmootherTests
 {
-    // Same constants the detector uses: large = > +25 % AND > +20 BPM; 3 cycles to confirm.
+    // Same constants the detector uses: large = > +25 % AND > +14 BPM; 5 cycles to confirm.
     private static TempoSmoother NewSmoother()
-        => new(jumpUpFactor: 1.25, jumpUpMinBpm: 20, confirmCycles: 3, confirmToleranceBpm: 8);
+        => new(jumpUpFactor: 1.25, jumpUpMinBpm: 14, confirmCycles: 5, confirmToleranceBpm: 8);
 
     [Fact]
     public void FirstReading_AdoptedImmediately()
@@ -38,7 +38,7 @@ public class TempoSmootherTests
     {
         var s = NewSmoother();
         s.Update(30);
-        // 40 clears the +25 % factor but not the +20 BPM floor → not "large".
+        // 40 clears the +25 % factor but not the +14 BPM floor → not "large".
         Assert.Equal(40, s.Update(40));
     }
 
@@ -58,7 +58,9 @@ public class TempoSmootherTests
         s.Update(100);
         Assert.Equal(100, s.Update(200)); // cycle 1 — pending, output unchanged
         Assert.Equal(100, s.Update(200)); // cycle 2 — still pending
-        Assert.Equal(200, s.Update(200)); // cycle 3 — confirmed, adopted
+        Assert.Equal(100, s.Update(200)); // cycle 3 — still pending
+        Assert.Equal(100, s.Update(200)); // cycle 4 — still pending
+        Assert.Equal(200, s.Update(200)); // cycle 5 — confirmed, adopted
     }
 
     [Fact]
@@ -71,6 +73,23 @@ public class TempoSmootherTests
         Assert.Equal(100, s.Update(100)); // spike gone → baseline retained, pending dropped
     }
 
+    // Regression for capture osf-20260605-125501.txt: a metronome stepped 20→30 BPM injects
+    // one short transition interval that the estimator briefly reads as ~37 BPM for ~4 cycles
+    // before the true 30 fills the window. The +14 floor gates the 37 (it is +17 over 20) but
+    // lets the genuine 30 (+10) through, and 5-cycle confirmation outlasts the overshoot so 30
+    // arrives and discards the pending 37 — the overshoot must never reach the output.
+    [Fact]
+    public void MetronomeStepOvershoot_NeverAdopted()
+    {
+        var s = NewSmoother();
+        Assert.Equal(20, s.Update(20));
+        Assert.Equal(20, s.Update(37)); // overshoot cycle 1 — gated, held
+        Assert.Equal(20, s.Update(37)); // cycle 2
+        Assert.Equal(20, s.Update(37)); // cycle 3
+        Assert.Equal(20, s.Update(37)); // cycle 4 — still under ConfirmCycles
+        Assert.Equal(30, s.Update(30)); // settle: +10 over 20 is not "large" → adopted, 37 dropped
+    }
+
     [Fact]
     public void CandidateOutsideTolerance_RestartsConfirmation()
     {
@@ -79,7 +98,9 @@ public class TempoSmootherTests
         Assert.Equal(100, s.Update(200)); // pending 200, count 1
         Assert.Equal(100, s.Update(220)); // |220-200| = 20 > 8 → new candidate, count 1
         Assert.Equal(100, s.Update(220)); // count 2
-        Assert.Equal(220, s.Update(220)); // count 3 → adopted
+        Assert.Equal(100, s.Update(220)); // count 3
+        Assert.Equal(100, s.Update(220)); // count 4
+        Assert.Equal(220, s.Update(220)); // count 5 → adopted
     }
 
     [Fact]

@@ -286,11 +286,24 @@ The filter is deliberately **asymmetric**:
 - **Decreases and small increases** are adopted immediately. Slowing the source must never
   be delayed (the device should not keep running fast), and small drift needs no gating.
 - **A large upward jump** — one that clears **both** a relative factor (`> +25 %`) **and**
-  an absolute floor (`> +20 BPM`) — becomes a *pending candidate* and is adopted only after
-  it persists for **3 consecutive cycles** (`TempoUpConfirmCycles`, ≈ 1.5 s). A spike that
+  an absolute floor (`> +14 BPM`) — becomes a *pending candidate* and is adopted only after
+  it persists for **5 consecutive cycles** (`TempoUpConfirmCycles`, ≈ 2.5 s). A spike that
   fades before then is discarded and the previous tempo is held. This is the literal reading
   of the requirement "large jumps up … need more than two rapid-succession ticks to be
   applied."
+- **Floor and confirm count were re-tuned** (was `+20 BPM` / 3 cycles) against a captured
+  20→30 BPM metronome step (`captures/osf-20260605-125501.txt`). Bumping the input tempo
+  injects one anomalously short transition interval — a single 1.6 s gap → a spurious **~37
+  BPM** read that the recency-weighted autocorrelation latches onto for ~one new beat period
+  (4 cycles at 30 BPM) before the true tempo fills the window. The `+20` floor let that 37
+  through (it is only +17 over the prior 20), and 3 cycles was short enough that it confirmed.
+  Lowering the floor to `+14` puts it *between* the genuine step (+10) and the overshoot
+  (+17), so the real 30 passes through immediately while the 37 is gated; raising confirm to
+  5 outlasts the 4-cycle overshoot, so the settle-down reading (30) arrives and discards the
+  pending 37 first. **Trade-off:** a *genuine* large up-jump is now adopted ~1 s later. That
+  latency is inherent — the only signal that an overshoot is spurious is that it falls back,
+  which takes ≈ one new beat period to observe (confidence does *not* separate them: at the
+  decision cycle the genuine 30→60 jump and the 37 artifact both read confidence ≈ 0.38).
 - **Requiring both** a factor and a floor for "large" avoids gating tiny absolute drift at
   low BPM (the factor alone would) and small relative wobble at high BPM (the floor alone
   would). Successive candidates within `TempoConfirmToleranceBpm` (8 BPM) count as confirming
