@@ -92,6 +92,37 @@ The following device mapping was empirically determined for the Hismith Pro 1 se
 Goal: Scan the whole application for any security concerns/issues and make sure it is trustworthy on other computers.
 When running the application on other computers, i want to avoid that windows flags the app as suspicious or untrusted.
 
+### Review findings (2026-06-10)
+Privacy posture is strong: no network code at all (no telemetry/auto-update/HttpClient/sockets) —
+nothing captured ever leaves the machine. System audio is processed in memory only (never written
+to disk; only the off-by-default `--capture-osf` flag persists derived numeric flux values). No
+exploitable security holes found: all `Process.Start` targets are hardcoded/own-path, JSON
+deserialization is a plain POCO in try/catch with clamping, no `BinaryFormatter`. The trust problem
+is packaging, not behavior: the binary is unsigned.
+
+### Task list
+- [ ] **Code-sign the executable (highest impact).** No Authenticode cert today → SmartScreen
+      "unknown publisher" warning on other machines. OV cert removes the warning; EV cert grants
+      near-instant SmartScreen reputation.
+- [x] **Add assembly metadata + an app.manifest.** ✅ Added Company/Product/Authors/Description/
+      Copyright/AssemblyTitle to the csproj (Win32 version resource now populated:
+      FileDescription/Company/Product/Copyright verified in the built binary) and an explicit
+      `asInvoker` `app.manifest` (also declares Win10/11 `supportedOS` and PerMonitorV2 DPI
+      awareness). `IncludeSourceRevisionInInformationalVersion=false` keeps ProductVersion clean.
+- [ ] **Reconsider self-extracting single-file packing.** `PublishSingleFile` +
+      `EnableCompressionInSingleFile` + `IncludeNativeLibrariesForSelfExtract` produces a compressed
+      bundle that self-extracts to temp — a pattern some heuristic AV engines penalize, especially
+      stacked on the keyboard hook + audio capture.
+- [ ] **Optionally swap the global LL keyboard hook for `RegisterHotKey`.** `GlobalKeyboardHook`
+      (`WH_KEYBOARD_LL`) is implemented responsibly (Space only, never stores/forwards keystrokes,
+      non-swallowing) but is behaviorally keylogger-shaped — exactly the AV/EDR keylogger heuristic.
+      `RegisterHotKey` achieves the same background emergency-stop without the system-wide hook
+      (trade-off: Space as a global hotkey is slightly awkward).
+- [ ] **Build SmartScreen reputation / submit to Microsoft** once signed, to pre-empt false positives.
+- [ ] **(Minor) BLE scan logging contains nearby-device PII.** Local logs record nearby BLE device
+      names/addresses/RSSI during a scan (`BleDeviceDiscoveryService`). Local-only, low risk —
+      consider reducing to debug level or redacting addresses.
+
 ## 5. Sound mode visualizer beat display 
 Make the sound mode visualizer beats align with the detected beats (instead of the calculated bpm).
 

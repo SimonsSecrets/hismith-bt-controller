@@ -9,6 +9,27 @@
     <Version>0.1.0</Version>
     <!-- Embedded as the native Win32 icon resource of the exe (Explorer, taskbar). -->
     <ApplicationIcon>Logo.ico</ApplicationIcon>
+
+    <!-- Win32 version-resource metadata. Without these the published exe ships blank
+         Company/Product/Description fields, which raises the suspicion score of an
+         unsigned binary on SmartScreen/AV (OpenPoints.md §4). -->
+    <Company>SimonsSecrets</Company>
+    <Product>HismithController</Product>
+    <Authors>SimonsSecrets</Authors>
+    <Description>Captures system audio, detects beats in real time, and controls a Hismith BLE device.</Description>
+    <Copyright>Copyright © SimonsSecrets 2026</Copyright>
+    <!-- Win32 FileDescription (shown by Explorer / SmartScreen) maps from AssemblyTitle,
+         not Description, so set it to a human-readable string. -->
+    <AssemblyTitle>HismithController — audio-reactive Hismith controller</AssemblyTitle>
+    <!-- AssemblyVersion/FileVersion default to $(Version); pin InformationalVersion to the
+         bare version and suppress the auto-appended +gitHash so the displayed ProductVersion
+         stays clean. -->
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <!-- Explicit asInvoker manifest: the app never requires elevation, so declaring it
+         outright stops Windows from prompting/heuristically elevating and signals intent. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <!-- Release publish: self-contained single-file exe (bundles the .NET runtime).

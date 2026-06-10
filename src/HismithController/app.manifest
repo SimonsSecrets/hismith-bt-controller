@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="0.1.0.0" name="HismithController.app"/>
+
+  <!-- The app runs entirely with standard-user rights (loopback audio capture, BLE GATT
+       writes, a user-scoped low-level keyboard hook); it never needs elevation. Declaring
+       asInvoker explicitly prevents the installer-detection heuristic from prompting for
+       admin and keeps the trust surface minimal (OpenPoints.md §4). -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <!-- Declare supported Windows versions so the OS reports the true version to the app
+       (rather than the Windows 8 compatibility shim) and the exe is recognized as a
+       modern, well-formed application. Windows 10/11 only — matches the net8.0-windows
+       10.0.19041.0 target. -->
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+    </application>
+  </compatibility>
+
+  <!-- Per-monitor v2 DPI awareness: WPF is DPI-aware, so declare it in the manifest to
+       avoid bitmap scaling on high-DPI / mixed-DPI multi-monitor setups. -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+    </windowsSettings>
+  </application>
+</assembly>
