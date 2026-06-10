@@ -91,7 +91,7 @@ public sealed class BleDeviceDiscoveryService : IDeviceDiscoveryService
         var device = new DiscoveredDevice(address, name, address, signal);
 
         _logger.LogInformation("Found BLE device: {Name} ({Address}) RSSI={Rssi}",
-            name, address, args.RawSignalStrengthInDBm);
+            BleLog.RedactName(name), BleLog.RedactAddress(address), args.RawSignalStrengthInDBm);
 
         DeviceFound?.Invoke(this, device);
     }

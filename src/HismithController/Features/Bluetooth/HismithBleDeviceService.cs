@@ -37,7 +37,7 @@ public sealed class HismithBleDeviceService : IBleDeviceService
         {
             SetState(BleConnectionState.Connecting);
             var address = ParseBluetoothAddress(device.Address);
-            _logger.LogInformation("Connecting to {Name} at {Address}", device.Name, device.Address);
+            _logger.LogInformation("Connecting to {Name} at {Address}", BleLog.RedactName(device.Name), BleLog.RedactAddress(device.Address));
             await ConnectToDeviceAsync(address);
         }
         catch (Exception ex)
@@ -126,7 +126,7 @@ public sealed class HismithBleDeviceService : IBleDeviceService
         _txCharacteristic = charsResult.Characteristics[0];
 
         SetState(BleConnectionState.Connected, _device.Name);
-        _logger.LogInformation("Connected to {Name}", _device.Name);
+        _logger.LogInformation("Connected to {Name}", BleLog.RedactName(_device.Name));
     }
 
     public async Task SendSpeedAsync(byte speed, CancellationToken cancellationToken = default)

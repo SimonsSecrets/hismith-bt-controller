@@ -126,9 +126,13 @@ is packaging, not behavior: the binary is unsigned.
       UI hint updated to "Alt + Space". Trade-off: while running, Alt+Space is swallowed system-wide
       (no longer opens the active window's system menu).
 - [ ] **Build SmartScreen reputation / submit to Microsoft** once signed, to pre-empt false positives.
-- [ ] **(Minor) BLE scan logging contains nearby-device PII.** Local logs record nearby BLE device
-      names/addresses/RSSI during a scan (`BleDeviceDiscoveryService`). Local-only, low risk —
-      consider reducing to debug level or redacting addresses.
+- [x] **(Minor) BLE scan logging contains nearby-device PII.** ✅ Both addresses and advertised
+      names are now redacted in the logs via `BleLog`. `RedactAddress` masks all but the last octet
+      (e.g. `**:**:**:**:**:F6`, kept so scan/connect lines stay correlatable); `RedactName` keeps
+      only the first character (e.g. `HISMITH` → `H***`, no length preserved). Applied at all three
+      sites — `BleDeviceDiscoveryService` ("Found BLE device") and `HismithBleDeviceService`
+      ("Connecting to" / "Connected to"). The real name still flows to the UI state for display;
+      only the log arguments are masked. RSSI is still logged. Covered by `BleLogTests`.
 
 ## 5. Sound mode visualizer beat display 
 Make the sound mode visualizer beats align with the detected beats (instead of the calculated bpm).
