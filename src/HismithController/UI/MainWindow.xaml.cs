@@ -1,18 +1,16 @@
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Input;
+using System.Windows.Interop;
 using HismithController.ViewModels;
 
 namespace HismithController;
 
 public partial class MainWindow : Window
 {
-    private const int VkSpace = 0x20;
-
     private readonly MainViewModel _viewModel;
 
-    // System-wide hook so the Spacebar emergency stop fires even when another window is focused.
-    private readonly GlobalKeyboardHook _globalHook = new();
+    // System-wide Alt+Space hotkey so the emergency stop fires even when another window is focused.
+    private readonly GlobalHotkey _emergencyHotkey = new();
 
     public MainWindow(MainViewModel viewModel)
     {
@@ -26,14 +24,14 @@ public partial class MainWindow : Window
         {
             TitleBarTheme.Apply(this, _viewModel.IsDarkTheme);
 
-            // Install from the UI thread so the hook's callbacks are dispatched back to it.
-            _globalHook.KeyDown += OnGlobalKeyDown;
-            _globalHook.Install();
+            // Register once the HWND exists; WM_HOTKEY is then dispatched on this UI thread.
+            _emergencyHotkey.Pressed += OnEmergencyHotkey;
+            _emergencyHotkey.Register(new WindowInteropHelper(this).Handle);
         };
         Closed += (_, _) =>
         {
-            _globalHook.KeyDown -= OnGlobalKeyDown;
-            _globalHook.Dispose();
+            _emergencyHotkey.Pressed -= OnEmergencyHotkey;
+            _emergencyHotkey.Dispose();
         };
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
@@ -44,22 +42,11 @@ public partial class MainWindow : Window
             TitleBarTheme.Apply(this, _viewModel.IsDarkTheme);
     }
 
-    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    // Runs on the UI thread (see GlobalHotkey.Pressed). The hotkey is global and focus-independent,
+    // so this single handler covers both the focused and background cases.
+    private void OnEmergencyHotkey()
     {
-        if (e.Key == Key.Space && _viewModel.IsConnected)
-        {
-            e.Handled = true;
-            if (_viewModel.EmergencyStopCommand.CanExecute(null))
-                _viewModel.EmergencyStopCommand.Execute(null);
-        }
-    }
-
-    // Runs on the UI thread (see GlobalKeyboardHook.KeyDown). Handles Space only when the app is
-    // NOT the active window; when it is focused, OnPreviewKeyDown already handles Space, so we bail
-    // here to avoid firing the stop twice.
-    private void OnGlobalKeyDown(int vkCode)
-    {
-        if (vkCode != VkSpace || !_viewModel.IsConnected || IsActive)
+        if (!_viewModel.IsConnected)
             return;
 
         if (_viewModel.EmergencyStopCommand.CanExecute(null))

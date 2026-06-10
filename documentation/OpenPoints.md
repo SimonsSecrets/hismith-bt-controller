@@ -8,6 +8,12 @@ non-swallowing) that fires the emergency stop on Spacebar even when another wind
 The hook is gated on `IsConnected` and bails when the app is the active window (the existing
 `OnPreviewKeyDown` path handles the focused case).
 
+Follow-up (§4 task #4): the system-wide keyboard hook was replaced by a `RegisterHotKey`-based
+**Alt+Space** global hotkey (`GlobalHotkey`), which is focus-independent (covers both the focused
+and background cases with one registration) and — unlike `WH_KEYBOARD_LL` — never observes other
+keystrokes, so it no longer matches the keylogger heuristic. The plain-Space `OnPreviewKeyDown`
+path and the text-field Space mirrors were removed; the UI hint now reads "Alt + Space".
+
 ## 2. Sound mode sudden tempo changes ✅ Resolved
 Issue: In sound mode, when changing the metronome input tempo, detected bpm often jumps really high for a short time.
 This is kind of expected, since the metronome temp change results in two ticks being really close together.
@@ -113,11 +119,12 @@ is packaging, not behavior: the binary is unsigned.
       `EnableCompressionInSingleFile` + `IncludeNativeLibrariesForSelfExtract` produces a compressed
       bundle that self-extracts to temp — a pattern some heuristic AV engines penalize, especially
       stacked on the keyboard hook + audio capture.
-- [ ] **Optionally swap the global LL keyboard hook for `RegisterHotKey`.** `GlobalKeyboardHook`
-      (`WH_KEYBOARD_LL`) is implemented responsibly (Space only, never stores/forwards keystrokes,
-      non-swallowing) but is behaviorally keylogger-shaped — exactly the AV/EDR keylogger heuristic.
-      `RegisterHotKey` achieves the same background emergency-stop without the system-wide hook
-      (trade-off: Space as a global hotkey is slightly awkward).
+- [x] **Swap the global LL keyboard hook for `RegisterHotKey`.** ✅ Replaced `GlobalKeyboardHook`
+      (`WH_KEYBOARD_LL`) with `GlobalHotkey`, a `RegisterHotKey`-based **Alt+Space** global hotkey.
+      It never observes other keystrokes (no keylogger heuristic) and is focus-independent, so the
+      plain-Space `OnPreviewKeyDown` path and the ManualMode text-field Space mirrors were removed.
+      UI hint updated to "Alt + Space". Trade-off: while running, Alt+Space is swallowed system-wide
+      (no longer opens the active window's system menu).
 - [ ] **Build SmartScreen reputation / submit to Microsoft** once signed, to pre-empt false positives.
 - [ ] **(Minor) BLE scan logging contains nearby-device PII.** Local logs record nearby BLE device
       names/addresses/RSSI during a scan (`BleDeviceDiscoveryService`). Local-only, low risk —

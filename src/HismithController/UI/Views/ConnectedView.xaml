@@ -50,7 +50,7 @@
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                             VerticalAlignment="Center">
                     <Border Style="{StaticResource KbdHint}">
-                        <TextBlock Text="Space" FontSize="11"
+                        <TextBlock Text="Alt + Space" FontSize="11"
                                    Foreground="{DynamicResource TextDimBrush}" />
                     </Border>
                     <TextBlock Text=" emergency stop" FontSize="12"

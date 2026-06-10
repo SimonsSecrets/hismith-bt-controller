@@ -12,8 +12,7 @@
         Height="960" Width="540"
         MinHeight="640" MinWidth="480"
         Background="{DynamicResource BackgroundBrush}"
-        FontFamily="Segoe UI"
-        PreviewKeyDown="OnPreviewKeyDown">
+        FontFamily="Segoe UI">
 
     <Window.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
